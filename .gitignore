@@ -1,0 +1,27 @@
+# Build and test output
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+coverage/
+
+# IDE and user state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local machine and agent instructions
+AGENTS.local.md
+
+# Local settings, logs, and temporary files
+*.log
+*.tmp
+*.bak
+
+# OS metadata
+Thumbs.db
+Desktop.ini
