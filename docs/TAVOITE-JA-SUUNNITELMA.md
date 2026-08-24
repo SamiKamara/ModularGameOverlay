@@ -1,5 +1,10 @@
 # ModularGameOverlay – tavoite ja toteutussuunnitelma
 
+> Toteutustilanne 23.8.2026: toimiva paikallinen `0.1.0`-testibuild on valmis.
+> Host-, migraatio-, moduuli-, UI-, hotkey-, testaus- ja publish-vaiheet on
+> toteutettu. Varsinainen release-hyväksyntä odottaa `docs/TESTING.md`-tiedoston
+> pelikohtaista ja moninäyttöistä käyttäjätestiä.
+
 ## 1. Dokumentin asema
 
 Tämä dokumentti on ModularGameOverlay-projektin ensisijainen tuote- ja

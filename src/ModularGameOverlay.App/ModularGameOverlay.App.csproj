@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>ModularGameOverlay</AssemblyName>
+    <RootNamespace>ModularGameOverlay.App</RootNamespace>
+    <Product>ModularGameOverlay</Product>
+    <Description>Unified modular game overlay host for SuperLighter, Aimoro, and SoundDirectionVisualizer.</Description>
+    <Authors>SamiKamara</Authors>
+    <Version>0.1.0</Version>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationIcon>Assets\ModularGameOverlay.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SuperLighter.Module\SuperLighter.App.csproj" />
+    <ProjectReference Include="..\Aimoro.Module\Aimoro.App.csproj" />
+    <ProjectReference Include="..\SoundDirectionVisualizer.Module\SoundDirectionVisualizer.App.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ModularGameOverlay.Tests" />
+  </ItemGroup>
+</Project>

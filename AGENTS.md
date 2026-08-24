@@ -28,6 +28,10 @@
 - Run the full Release build and automated tests before handing off changes that
   can affect runnable or test output. Documentation-only and repository-policy-
   only changes do not require a build solely for validation.
+- On this development machine, use `scripts\build-and-publish.ps1` for every
+  build that produces runnable output. It runs the complete Release verification,
+  creates the canonical single-file publish, and synchronizes the desktop
+  shortcut required by `AGENTS.local.md`.
 - If `AGENTS.local.md` exists, read and obey it before any build or publish task.
   It contains machine-specific workflow requirements and is intentionally not
   committed.

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">ModularGameOverlay icon</title>
+  <desc id="desc">Four tight modular corner brackets surrounding a centered overlay target.</desc>
+  <rect width="256" height="256" rx="44" fill="#12151C"/>
+  <path fill="#36D3B7" d="M42 42h72v24H66v48H42V42zm100 148h48v-48h24v72h-72v-24z"/>
+  <path fill="#FFBB5C" d="M142 42h72v72h-24V66h-48V42zM42 142h24v48h48v24H42v-72z"/>
+  <path fill="#F1F4F9" fill-rule="evenodd" d="M128 82a46 46 0 1 0 0 92 46 46 0 0 0 0-92zm0 20a26 26 0 1 1 0 52 26 26 0 0 1 0-52z"/>
+  <rect x="118" y="118" width="20" height="20" rx="3" fill="#F1F4F9"/>
+</svg>

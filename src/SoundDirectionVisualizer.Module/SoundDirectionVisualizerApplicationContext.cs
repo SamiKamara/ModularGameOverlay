@@ -1,0 +1,1211 @@
+using Microsoft.Win32;
+using SoundDirectionVisualizer.App.Native;
+using SoundDirectionVisualizer.App.Services;
+using SoundDirectionVisualizer.App.UI;
+using SoundDirectionVisualizer.Core.Direction;
+using System.Drawing;
+
+namespace SoundDirectionVisualizer.App;
+
+public sealed class SoundDirectionVisualizerApplicationContext : ApplicationContext
+{
+    private readonly object _frameGate = new();
+    private readonly SettingsStore _settingsStore = new();
+    private readonly AudioCaptureService _audioCapture = new();
+    private readonly SteamLibraryService _steamLibraryService = new();
+    private readonly GlobalHotkeyManager _hotkeyManager = new();
+    private readonly DirectionOverlayForm _overlayForm = new();
+    private readonly Control _uiDispatcher = new();
+    private readonly EventWaitHandle _openSettingsSignal;
+    private readonly RegisteredWaitHandle _openSettingsRegistration;
+    private readonly Icon _trayIcon;
+    private readonly NotifyIcon _notifyIcon;
+    private readonly ContextMenuStrip _trayMenu = new();
+    private readonly ToolStripMenuItem _toggleOverlayMenuItem;
+    private readonly ToolStripMenuItem _autoTargetMenuItem;
+    private readonly ToolStripMenuItem _monitorsMenuItem;
+    private readonly ToolStripMenuItem _audioStatusMenuItem;
+    private readonly Dictionary<string, ToolStripMenuItem> _monitorMenuItems = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Windows.Forms.Timer _renderTimer = new() { Interval = 33 };
+    private readonly System.Windows.Forms.Timer _targetRefreshTimer = new() { Interval = 2000 };
+    private readonly SilentEndpointProbeSchedule _silentEndpointProbeSchedule = new();
+    private readonly MultichannelProbeRetrySchedule _multichannelProbeRetrySchedule = new();
+    private readonly CaptureSessionHistory _captureSessionHistory = new();
+    private readonly CenteredGameAudioFallbackDetector _centeredGameAudioFallbackDetector = new();
+    private readonly System.Windows.Forms.Timer? _startupSettingsTimer;
+    private readonly GameWindowMonitor _gameWindowMonitor;
+    private readonly GameAudioProcessResolver _gameAudioProcessResolver = new();
+    private readonly NativeMethods.WinEventProc _foregroundWindowEventProc;
+    private AppSettings _settings;
+    private Screen _currentScreen;
+    private DetectedGameTarget? _detectedGame;
+    private GameAudioProcessTarget? _detectedGameAudio;
+    private DirectionFrame? _latestFrame;
+    private AudioChannelMeterFrame? _latestAudioChannelMeterFrame;
+    private SettingsForm? _activeSettingsForm;
+    private bool _autoTargetRefreshInProgress;
+    private bool _pendingAutoTargetRefresh;
+    private bool _pendingAutoTargetForceRefresh;
+    private bool _audioEndpointProbeInProgress;
+    private bool _multichannelProbeRetryInProgress;
+    private bool _automaticGameProcessAudioFallbackActive;
+    private bool _isExiting;
+    private bool _captureFailureShown;
+    private string? _captureFailure;
+    private string? _automaticEndpointId;
+    private int _audioCaptureGeneration;
+    private int? _processCaptureFallbackNoticeProcessId;
+    private IntPtr _foregroundWindowHook;
+    private readonly Action<AppSettings>? _externalSave;
+    private readonly bool _embeddedHost;
+
+    public SoundDirectionVisualizerApplicationContext(
+        EventWaitHandle openSettingsSignal,
+        bool openSettingsOnStartup,
+        AppSettings? initialSettings = null,
+        Action<AppSettings>? externalSave = null,
+        bool embeddedHost = false)
+    {
+        _externalSave = externalSave;
+        _embeddedHost = embeddedHost;
+        _openSettingsSignal = openSettingsSignal;
+        _settings = initialSettings?.Clone() ?? _settingsStore.Load();
+        _settings.Normalize();
+        _captureSessionHistory.Add(
+            DateTimeOffset.Now,
+            "Application session started",
+            "The event log is held in memory for this application session and is cleared when the application exits.");
+        _gameWindowMonitor = new GameWindowMonitor(_steamLibraryService);
+        _currentScreen = DisplayInfoFormatter.ResolveScreen(_settings.SelectedMonitorDeviceName);
+        _trayIcon = LoadTrayIcon();
+        _foregroundWindowEventProc = HandleForegroundWindowChanged;
+        _ = _uiDispatcher.Handle;
+        _openSettingsRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _openSettingsSignal,
+            static (state, _) => ((SoundDirectionVisualizerApplicationContext)state!).RequestOpenSettings(),
+            this,
+            Timeout.Infinite,
+            false);
+
+        _toggleOverlayMenuItem = new ToolStripMenuItem(
+            "Visualizer Enabled",
+            null,
+            (_, _) => ToggleOverlay());
+        _autoTargetMenuItem = new ToolStripMenuItem(
+            "Auto Target Steam Game Display",
+            null,
+            (_, _) => SetAutoTarget(!_settings.AutoDetectSteamGameMonitor));
+        _monitorsMenuItem = new ToolStripMenuItem("Manual Display");
+        _audioStatusMenuItem = new ToolStripMenuItem("Audio: starting...") { Enabled = false };
+        var settingsMenuItem = new ToolStripMenuItem("Settings...", null, (_, _) => OpenSettings());
+        var exitMenuItem = new ToolStripMenuItem("Exit", null, (_, _) => ExitApplication());
+
+        _trayMenu.Items.AddRange(
+            _toggleOverlayMenuItem,
+            _autoTargetMenuItem,
+            _monitorsMenuItem,
+            new ToolStripSeparator(),
+            _audioStatusMenuItem,
+            new ToolStripSeparator(),
+            settingsMenuItem,
+            exitMenuItem);
+        ConfigureTrayMenu();
+
+        _notifyIcon = new NotifyIcon
+        {
+            ContextMenuStrip = _trayMenu,
+            Icon = _trayIcon,
+            Text = "Sound Direction Visualizer",
+            Visible = !embeddedHost
+        };
+        _notifyIcon.DoubleClick += (_, _) => OpenSettings();
+        _notifyIcon.MouseClick += HandleNotifyIconMouseClick;
+
+        _hotkeyManager.HotkeyPressed += HandleHotkeyPressed;
+        _audioCapture.FrameAvailable += HandleDirectionFrame;
+        _audioCapture.ChannelLevelsAvailable += HandleAudioChannelLevels;
+        _audioCapture.CaptureFailed += HandleCaptureFailed;
+        _audioCapture.CaptureStatusChanged += HandleCaptureStatusChanged;
+        _renderTimer.Tick += HandleRenderTick;
+        _targetRefreshTimer.Tick += HandlePeriodicRefresh;
+        SystemEvents.DisplaySettingsChanged += HandleDisplaySettingsChanged;
+
+        _foregroundWindowHook = NativeMethods.SetWinEventHook(
+            NativeMethods.EventSystemForeground,
+            NativeMethods.EventSystemForeground,
+            IntPtr.Zero,
+            _foregroundWindowEventProc,
+            0,
+            0,
+            NativeMethods.WinEventOutOfContext | NativeMethods.WinEventSkipOwnProcess);
+
+        RebuildMonitorMenu();
+        RegisterHotkeys();
+        _overlayForm.ApplySettings(_settings);
+        _overlayForm.SetTargetScreen(_currentScreen);
+        ApplyOverlayState();
+        if (!embeddedHost || _settings.OverlayEnabled)
+        {
+            StartAudioCapture();
+        }
+        RefreshTargetScreen(force: true);
+        if (!embeddedHost || _settings.OverlayEnabled)
+        {
+            _renderTimer.Start();
+            _targetRefreshTimer.Start();
+        }
+
+        if (openSettingsOnStartup && !embeddedHost)
+        {
+            _startupSettingsTimer = new System.Windows.Forms.Timer { Interval = 50 };
+            _startupSettingsTimer.Tick += HandleStartupSettingsTimerTick;
+            _startupSettingsTimer.Start();
+        }
+        else if (!embeddedHost)
+        {
+            ShowStartupHint();
+        }
+    }
+
+    public AppSettings Settings => _settings.Clone();
+
+    public bool IsEnabled => _settings.OverlayEnabled;
+
+    private void HandleDirectionFrame(object? sender, DirectionFrame frame)
+    {
+        var requestAutomaticGameAudioFallback = false;
+
+        lock (_frameGate)
+        {
+            _latestFrame = frame;
+            if (!frame.Estimate.IsQuiet)
+            {
+                _silentEndpointProbeSchedule.ObserveAudibleFrame(DateTimeOffset.UtcNow);
+            }
+
+            if (_settings.AutomaticallyFallbackToGameProcessAudio
+                && !_settings.UseDetectedGameProcessAudio
+                && !_automaticGameProcessAudioFallbackActive
+                && _detectedGame is not null
+                && !_audioCapture.IsProcessCapture)
+            {
+                requestAutomaticGameAudioFallback = _centeredGameAudioFallbackDetector.Observe(
+                    frame.Timestamp,
+                    frame.Estimate);
+            }
+            else
+            {
+                _centeredGameAudioFallbackDetector.Reset();
+            }
+        }
+
+        if (requestAutomaticGameAudioFallback)
+        {
+            RequestAutomaticGameProcessAudioFallback();
+        }
+    }
+
+    private void HandleAudioChannelLevels(object? sender, AudioChannelMeterFrame frame)
+    {
+        lock (_frameGate)
+        {
+            _latestAudioChannelMeterFrame = frame;
+        }
+    }
+
+    private void RequestAutomaticGameProcessAudioFallback()
+    {
+        try
+        {
+            if (!_uiDispatcher.IsDisposed)
+            {
+                _uiDispatcher.BeginInvoke(new MethodInvoker(ActivateAutomaticGameProcessAudioFallback));
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void ActivateAutomaticGameProcessAudioFallback()
+    {
+        if (_isExiting
+            || !_settings.AutomaticallyFallbackToGameProcessAudio
+            || _settings.UseDetectedGameProcessAudio
+            || _automaticGameProcessAudioFallbackActive
+            || _detectedGame is null
+            || _audioCapture.IsProcessCapture)
+        {
+            return;
+        }
+
+        _automaticGameProcessAudioFallbackActive = true;
+        lock (_frameGate)
+        {
+            _centeredGameAudioFallbackDetector.Reset();
+        }
+
+        _notifyIcon.ShowBalloonTip(
+            6000,
+            "Centered game audio detected",
+            $"{_detectedGame.ProcessName} remained centered for eight seconds. " +
+            "Trying direct game-process audio automatically.",
+            ToolTipIcon.Info);
+        RefreshTargetScreen(force: true);
+    }
+
+    private void HandleCaptureFailed(object? sender, string message)
+    {
+        lock (_frameGate)
+        {
+            _captureFailure = message;
+        }
+    }
+
+    private void HandleCaptureStatusChanged(object? sender, AudioCaptureStatus status)
+    {
+        try
+        {
+            if (!_uiDispatcher.IsDisposed)
+            {
+                _uiDispatcher.BeginInvoke(new MethodInvoker(() =>
+                {
+                    if (Equals(_audioCapture.CurrentStatus, status))
+                    {
+                        var now = DateTimeOffset.Now;
+                        _multichannelProbeRetrySchedule.ObserveStatus(status, now);
+                        var sessionEvent = CaptureSessionEventFormatter.FromStatus(
+                            status,
+                            now,
+                            _multichannelProbeRetrySchedule.NextRetryAt);
+                        _captureSessionHistory.Add(
+                            sessionEvent.Timestamp,
+                            sessionEvent.Event,
+                            sessionEvent.Reason);
+                        ApplyAudioStatus(status);
+                        RefreshStatusForm();
+                    }
+                }));
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void HandleRenderTick(object? sender, EventArgs eventArgs)
+    {
+        DirectionFrame? frame;
+        AudioChannelMeterFrame? channelMeterFrame;
+        string? failure;
+
+        lock (_frameGate)
+        {
+            frame = _latestFrame;
+            channelMeterFrame = _latestAudioChannelMeterFrame;
+            failure = _captureFailure;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        _overlayForm.UpdateFrame(frame, now);
+        if (_activeSettingsForm is not null && !_activeSettingsForm.IsDisposed)
+        {
+            var liveChannelMeterFrame = _settings.DebugForceMultichannelSource
+                && channelMeterFrame is not null
+                && now - channelMeterFrame.Timestamp <= TimeSpan.FromSeconds(1)
+                    ? channelMeterFrame
+                    : null;
+            _activeSettingsForm.UpdateChannelVisualization(liveChannelMeterFrame);
+        }
+
+        if (failure is not null && !_captureFailureShown)
+        {
+            _captureFailureShown = true;
+            _audioStatusMenuItem.Text = "Audio: capture error";
+            _captureSessionHistory.Add(
+                DateTimeOffset.Now,
+                "Audio capture error",
+                failure);
+            RefreshStatusForm();
+            _notifyIcon.ShowBalloonTip(
+                5000,
+                "Audio capture error",
+                failure,
+                ToolTipIcon.Error);
+        }
+    }
+
+    private async void StartAudioCapture(string? automaticEndpointId = null)
+    {
+        if (_embeddedHost && !_settings.OverlayEnabled)
+        {
+            await _audioCapture.StopAsync();
+            return;
+        }
+
+        var generation = ++_audioCaptureGeneration;
+        var settings = _settings.Clone();
+        var useDetectedGameProcessAudio = ShouldUseDetectedGameProcessAudio;
+        var captureMode = DetectedGameAudioCaptureModeResolver.Resolve(
+            settings,
+            useDetectedGameProcessAudio,
+            _detectedGameAudio is not null);
+        var opportunisticMultichannel = captureMode == DetectedGameAudioCaptureMode.BestAvailableProbe;
+        var forceMultichannelSource = captureMode == DetectedGameAudioCaptureMode.ForcedMultichannelSource;
+        var preferredGame = captureMode != DetectedGameAudioCaptureMode.EndpointOnly
+            ? _detectedGameAudio
+            : null;
+        var endpointOverride = captureMode != DetectedGameAudioCaptureMode.DirectProcess
+            && settings.AudioDeviceId is null
+                ? automaticEndpointId
+                : null;
+        _automaticEndpointId = endpointOverride;
+        _multichannelProbeRetrySchedule.Reset();
+        RefreshStatusForm();
+        lock (_frameGate)
+        {
+            _latestFrame = null;
+            _latestAudioChannelMeterFrame = null;
+            _captureFailure = null;
+            _silentEndpointProbeSchedule.Reset(DateTimeOffset.UtcNow);
+            _centeredGameAudioFallbackDetector.Reset();
+        }
+
+        _captureFailureShown = false;
+
+        try
+        {
+            await _audioCapture.StartAsync(
+                settings,
+                preferredGame?.ProcessId,
+                preferredGame?.ProcessName,
+                endpointOverride,
+                opportunisticMultichannel,
+                forceMultichannelSource);
+
+            if (_isExiting || generation != _audioCaptureGeneration)
+            {
+                return;
+            }
+
+            if (_audioCapture.CurrentStatus is not null)
+            {
+                ApplyAudioStatus(_audioCapture.CurrentStatus);
+            }
+
+            if (_audioCapture.ProcessCaptureFallbackReason is not null
+                && preferredGame is not null
+                && _processCaptureFallbackNoticeProcessId != preferredGame.ProcessId)
+            {
+                _processCaptureFallbackNoticeProcessId = preferredGame.ProcessId;
+                _notifyIcon.ShowBalloonTip(
+                    6000,
+                    "Game audio capture fallback",
+                    $"Direct capture from {preferredGame.ProcessName} was unavailable. " +
+                    "The selected output device is being analyzed instead.",
+                    ToolTipIcon.Warning);
+            }
+            else if (_audioCapture.IsProcessCapture)
+            {
+                _processCaptureFallbackNoticeProcessId = null;
+            }
+        }
+        catch (Exception exception)
+        {
+            if (_isExiting || generation != _audioCaptureGeneration)
+            {
+                return;
+            }
+
+            _audioStatusMenuItem.Text = "Audio: unavailable";
+            _captureFailureShown = true;
+            _captureSessionHistory.Add(
+                DateTimeOffset.Now,
+                "Audio capture could not start",
+                exception.Message);
+            RefreshStatusForm();
+            _notifyIcon.ShowBalloonTip(
+                6000,
+                "Sound Direction Visualizer",
+                exception.Message,
+                ToolTipIcon.Error);
+        }
+    }
+
+    private void ApplyAudioStatus(AudioCaptureStatus status)
+    {
+        if (_isExiting)
+        {
+            return;
+        }
+
+        var usingAutomaticEndpoint = _automaticEndpointId is not null
+            && string.Equals(
+                _automaticEndpointId,
+                status.DeviceId,
+                StringComparison.OrdinalIgnoreCase);
+        var usingAutomaticGameFallback = _automaticGameProcessAudioFallbackActive
+            && !_settings.UseDetectedGameProcessAudio
+            && status.IsProcessCapture;
+        var source = usingAutomaticGameFallback
+            ? $"Auto game fallback: {status.SourceName}"
+            : usingAutomaticEndpoint
+                ? $"Auto endpoint fallback: {status.SourceName}"
+                : status.SourceName;
+        _audioStatusMenuItem.Text =
+            $"Audio: {source} | {AudioCaptureStatusFormatter.FormatDetails(status)}";
+    }
+
+    private AudioStatusSnapshot CreateAudioStatusSnapshot() => new(
+        _audioCapture.CurrentStatus,
+        _multichannelProbeRetrySchedule.NextRetryAt,
+        _captureSessionHistory.Snapshot(),
+        _settings.DebugForceMultichannelSource);
+
+    private void RefreshStatusForm()
+    {
+        if (_activeSettingsForm is not null && !_activeSettingsForm.IsDisposed)
+        {
+            _activeSettingsForm.UpdateStatus(CreateAudioStatusSnapshot());
+        }
+    }
+
+    private void HandleHotkeyPressed(object? sender, HotkeyAction action)
+    {
+        switch (action)
+        {
+            case HotkeyAction.ToggleOverlay:
+                ToggleOverlay();
+                break;
+            case HotkeyAction.CycleMonitor:
+                CycleMonitor();
+                break;
+            case HotkeyAction.OpenSettings:
+                OpenSettings();
+                break;
+        }
+    }
+
+    public void ToggleOverlay()
+    {
+        _settings.OverlayEnabled = !_settings.OverlayEnabled;
+        PersistSettings();
+        ApplyOverlayState();
+        UpdateMenuState();
+        if (_embeddedHost)
+        {
+            if (_settings.OverlayEnabled)
+            {
+                _renderTimer.Start();
+                _targetRefreshTimer.Start();
+                RefreshTargetScreen(force: true);
+            }
+            else
+            {
+                _renderTimer.Stop();
+                _targetRefreshTimer.Stop();
+            }
+
+            StartAudioCapture();
+        }
+    }
+
+    public void SetEnabled(bool enabled)
+    {
+        if (_settings.OverlayEnabled != enabled)
+        {
+            ToggleOverlay();
+        }
+    }
+
+    private void SetAutoTarget(bool enabled)
+    {
+        _settings.AutoDetectSteamGameMonitor = enabled;
+        PersistSettings();
+        RefreshTargetScreen(force: true);
+    }
+
+    private void SelectManualMonitor(string deviceName)
+    {
+        _settings.AutoDetectSteamGameMonitor = false;
+        _settings.SelectedMonitorDeviceName = deviceName;
+        PersistSettings();
+        RefreshTargetScreen(force: true);
+    }
+
+    private void HandlePeriodicRefresh(object? sender, EventArgs eventArgs)
+    {
+        RefreshTargetScreen();
+        ProbeSilentDefaultAudioEndpoint();
+        RetryBestAvailableMultichannelProbe();
+    }
+
+    private bool ShouldUseDetectedGameProcessAudio =>
+        _settings.UseDetectedGameProcessAudio
+        || (_settings.AutomaticallyFallbackToGameProcessAudio
+            && _automaticGameProcessAudioFallbackActive);
+
+    private bool NeedsSteamGameDetection =>
+        _settings.AutoDetectSteamGameMonitor
+        || _settings.UseDetectedGameProcessAudio
+        || _settings.UseBestAvailableMultichannelAudio
+        || _settings.DebugForceMultichannelSource
+        || _settings.AutomaticallyFallbackToGameProcessAudio;
+
+    private void ProbeSilentDefaultAudioEndpoint()
+    {
+        if (_isExiting
+            || _audioEndpointProbeInProgress
+            || ShouldUseDetectedGameProcessAudio
+            || _settings.AudioDeviceId is not null
+            || _audioCapture.IsProcessCapture
+            || _audioCapture.IsMultichannelProbeActive
+            || _audioCapture.ActiveDeviceId is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        lock (_frameGate)
+        {
+            if (!_silentEndpointProbeSchedule.TryBeginProbe(now))
+            {
+                return;
+            }
+        }
+
+        _audioEndpointProbeInProgress = true;
+        _ = ProbeSilentDefaultAudioEndpointAsync(
+            _audioCaptureGeneration,
+            _audioCapture.ActiveDeviceId);
+    }
+
+    private async Task ProbeSilentDefaultAudioEndpointAsync(
+        int captureGeneration,
+        string activeDeviceId)
+    {
+        try
+        {
+            var candidate = await Task.Run(() =>
+                AudioEndpointService.FindActiveStereoRenderEndpoint(activeDeviceId));
+
+            if (_isExiting
+                || captureGeneration != _audioCaptureGeneration
+                || ShouldUseDetectedGameProcessAudio
+                || _settings.AudioDeviceId is not null)
+            {
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            lock (_frameGate)
+            {
+                _silentEndpointProbeSchedule.CompleteProbe(
+                    now,
+                    sourceChanged: candidate is not null);
+            }
+
+            if (candidate?.Id is not null)
+            {
+                StartAudioCapture(candidate.Id);
+            }
+        }
+        finally
+        {
+            _audioEndpointProbeInProgress = false;
+        }
+    }
+
+    private async void RetryBestAvailableMultichannelProbe()
+    {
+        var target = _detectedGameAudio;
+        var forceMultichannelSource = _settings.DebugForceMultichannelSource;
+        if (_isExiting
+            || _multichannelProbeRetryInProgress
+            || (!_settings.UseBestAvailableMultichannelAudio && !forceMultichannelSource)
+            || (ShouldUseDetectedGameProcessAudio && !forceMultichannelSource)
+            || target is null
+            || _audioCapture.IsProcessCapture
+            || _audioCapture.IsMultichannelProbeActive)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (!_multichannelProbeRetrySchedule.TryBeginRetry(now))
+        {
+            return;
+        }
+
+        var expectedStatus = _audioCapture.CurrentStatus;
+        if (expectedStatus is null)
+        {
+            _multichannelProbeRetrySchedule.DeferRetry(now);
+            return;
+        }
+
+        _multichannelProbeRetryInProgress = true;
+        var captureGeneration = _audioCaptureGeneration;
+        _captureSessionHistory.Add(
+            now,
+            forceMultichannelSource
+                ? "Debug-forced multichannel retry requested"
+                : "Automatic multichannel retry requested",
+            $"Rechecking the detected audio process {target.ProcessName} because an earlier 7.1/5.1 activation or validation was unavailable or uninformative.");
+        RefreshStatusForm();
+
+        try
+        {
+            var started = await _audioCapture.RetryOpportunisticMultichannelAsync(
+                target.ProcessId,
+                target.ProcessName,
+                expectedStatus,
+                forceMultichannelSource);
+            if (!started
+                && !_isExiting
+                && captureGeneration == _audioCaptureGeneration)
+            {
+                _multichannelProbeRetrySchedule.DeferRetry(DateTimeOffset.Now);
+                _captureSessionHistory.Add(
+                    DateTimeOffset.Now,
+                    "Multichannel retry deferred",
+                    "The active audio source was changing or the previous probe was still stopping; the retry will be attempted again shortly.");
+            }
+        }
+        catch (Exception exception)
+        {
+            if (!_isExiting && captureGeneration == _audioCaptureGeneration)
+            {
+                _multichannelProbeRetrySchedule.DeferRetry(DateTimeOffset.Now);
+                _captureSessionHistory.Add(
+                    DateTimeOffset.Now,
+                    "Multichannel retry failed",
+                    exception.Message);
+            }
+        }
+        finally
+        {
+            _multichannelProbeRetryInProgress = false;
+            RefreshStatusForm();
+        }
+    }
+
+    public void CycleMonitor()
+    {
+        var screens = Screen.AllScreens;
+        if (screens.Length == 0)
+        {
+            return;
+        }
+
+        var currentIndex = Array.FindIndex(screens, screen =>
+            string.Equals(screen.DeviceName, _currentScreen.DeviceName, StringComparison.OrdinalIgnoreCase));
+        var next = screens[(Math.Max(0, currentIndex) + 1) % screens.Length];
+        SelectManualMonitor(next.DeviceName);
+    }
+
+    public void OpenSettings()
+    {
+        if (_activeSettingsForm is not null && !_activeSettingsForm.IsDisposed)
+        {
+            if (_activeSettingsForm.WindowState == FormWindowState.Minimized)
+            {
+                _activeSettingsForm.WindowState = FormWindowState.Normal;
+            }
+
+            _activeSettingsForm.Activate();
+            return;
+        }
+
+        _hotkeyManager.ClearBindings();
+        _activeSettingsForm = new SettingsForm(_settings, CreateAudioStatusSnapshot());
+        _activeSettingsForm.OverlayPreviewChanged += HandleOverlayPreviewChanged;
+        var settingsSaved = false;
+
+        try
+        {
+            if (_activeSettingsForm.ShowDialog() == DialogResult.OK)
+            {
+                var previousAudioDeviceId = _settings.AudioDeviceId;
+                var nextSettings = _activeSettingsForm.ResultSettings.Clone();
+                if (!nextSettings.AutomaticallyFallbackToGameProcessAudio
+                    || nextSettings.UseDetectedGameProcessAudio
+                    || !string.Equals(
+                        previousAudioDeviceId,
+                        nextSettings.AudioDeviceId,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    _automaticGameProcessAudioFallbackActive = false;
+                    lock (_frameGate)
+                    {
+                        _centeredGameAudioFallbackDetector.Reset();
+                    }
+                }
+
+                _settings = nextSettings;
+                settingsSaved = true;
+                PersistSettings();
+                _overlayForm.ApplySettings(_settings);
+                RebuildMonitorMenu();
+                StartAudioCapture();
+                RefreshTargetScreen(force: true);
+                ApplyOverlayState();
+            }
+        }
+        finally
+        {
+            _activeSettingsForm.OverlayPreviewChanged -= HandleOverlayPreviewChanged;
+
+            if (!settingsSaved)
+            {
+                _overlayForm.ApplySettings(_settings);
+                ApplyOverlayState();
+            }
+
+            _activeSettingsForm.Dispose();
+            _activeSettingsForm = null;
+            RegisterHotkeys();
+        }
+    }
+
+    private void HandleOverlayPreviewChanged(AppSettings previewSettings)
+    {
+        _overlayForm.ApplySettings(previewSettings);
+
+        if (previewSettings.OverlayEnabled)
+        {
+            if (!_overlayForm.Visible)
+            {
+                _overlayForm.Show();
+            }
+        }
+        else if (_overlayForm.Visible)
+        {
+            _overlayForm.Hide();
+        }
+    }
+
+    private void RequestOpenSettings()
+    {
+        try
+        {
+            if (!_uiDispatcher.IsDisposed)
+            {
+                _uiDispatcher.BeginInvoke(new MethodInvoker(OpenSettings));
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void RegisterHotkeys()
+    {
+        if (_embeddedHost)
+        {
+            return;
+        }
+
+        var bindings = new Dictionary<HotkeyAction, HotkeyDefinition>
+        {
+            [HotkeyAction.ToggleOverlay] = _settings.ToggleHotkey,
+            [HotkeyAction.CycleMonitor] = _settings.CycleMonitorHotkey,
+            [HotkeyAction.OpenSettings] = _settings.OpenSettingsHotkey
+        };
+        _hotkeyManager.ReplaceBindings(bindings, out var failures);
+
+        if (failures.Count > 0)
+        {
+            _notifyIcon.ShowBalloonTip(
+                4000,
+                "Hotkey warning",
+                "One or more hotkeys are already in use by another application.",
+                ToolTipIcon.Warning);
+        }
+    }
+
+    private void RefreshTargetScreen(bool force = false)
+    {
+        if (_isExiting)
+        {
+            return;
+        }
+
+        if (!NeedsSteamGameDetection)
+        {
+            var previousProcessId = _detectedGame?.ProcessId;
+            _detectedGame = null;
+            _detectedGameAudio = null;
+            _automaticGameProcessAudioFallbackActive = false;
+            lock (_frameGate)
+            {
+                _centeredGameAudioFallbackDetector.Reset();
+            }
+
+            if (previousProcessId.HasValue || _audioCapture.IsProcessCapture)
+            {
+                StartAudioCapture();
+            }
+
+            ApplyResolvedScreen(DisplayInfoFormatter.ResolveScreen(_settings.SelectedMonitorDeviceName), force);
+            return;
+        }
+
+        QueueAutoTargetRefresh(force);
+    }
+
+    private void QueueAutoTargetRefresh(bool force)
+    {
+        _pendingAutoTargetRefresh = true;
+        _pendingAutoTargetForceRefresh |= force;
+
+        if (!_autoTargetRefreshInProgress)
+        {
+            _ = RefreshAutoTargetAsync();
+        }
+    }
+
+    private async Task RefreshAutoTargetAsync()
+    {
+        if (_autoTargetRefreshInProgress)
+        {
+            return;
+        }
+
+        _autoTargetRefreshInProgress = true;
+
+        try
+        {
+            while (_pendingAutoTargetRefresh)
+            {
+                var force = _pendingAutoTargetForceRefresh;
+                _pendingAutoTargetRefresh = false;
+                _pendingAutoTargetForceRefresh = false;
+
+                var resolveGameAudioProcess = ShouldUseDetectedGameProcessAudio
+                    || _settings.UseBestAvailableMultichannelAudio
+                    || _settings.DebugForceMultichannelSource;
+                var detection = await Task.Run(() =>
+                {
+                    try
+                    {
+                        var game = _gameWindowMonitor.Detect();
+                        var audio = resolveGameAudioProcess && game is not null
+                            ? _gameAudioProcessResolver.Resolve(game)
+                            : null;
+                        return (Game: game, Audio: audio);
+                    }
+                    catch
+                    {
+                        return (Game: (DetectedGameTarget?)null, Audio: (GameAudioProcessTarget?)null);
+                    }
+                });
+
+                if (_isExiting || !NeedsSteamGameDetection)
+                {
+                    return;
+                }
+
+                var previousGameProcessId = _detectedGame?.ProcessId;
+                var previousPreferredProcessId = resolveGameAudioProcess
+                    ? _detectedGameAudio?.ProcessId
+                    : null;
+                var gameChanged = previousGameProcessId != detection.Game?.ProcessId;
+                if (gameChanged)
+                {
+                    _automaticGameProcessAudioFallbackActive = false;
+                    lock (_frameGate)
+                    {
+                        _centeredGameAudioFallbackDetector.Reset();
+                    }
+                }
+
+                _detectedGame = detection.Game;
+                _detectedGameAudio = resolveGameAudioProcess
+                    ? detection.Audio
+                    : null;
+                var nextPreferredProcessId = resolveGameAudioProcess
+                    ? detection.Audio?.ProcessId
+                    : null;
+                if (previousPreferredProcessId != nextPreferredProcessId
+                    || (gameChanged
+                        && (_audioCapture.IsProcessCapture
+                            || _settings.UseBestAvailableMultichannelAudio
+                            || _settings.DebugForceMultichannelSource)))
+                {
+                    StartAudioCapture();
+                }
+
+                var resolvedScreen = _settings.AutoDetectSteamGameMonitor
+                    ? detection.Game?.Screen ?? _currentScreen
+                    : DisplayInfoFormatter.ResolveScreen(_settings.SelectedMonitorDeviceName);
+                ApplyResolvedScreen(resolvedScreen, force);
+            }
+        }
+        finally
+        {
+            _autoTargetRefreshInProgress = false;
+
+            if (!_isExiting && _pendingAutoTargetRefresh)
+            {
+                _ = RefreshAutoTargetAsync();
+            }
+        }
+    }
+
+    private void ApplyResolvedScreen(Screen screen, bool force)
+    {
+        var changed = force || !string.Equals(
+            screen.DeviceName,
+            _currentScreen.DeviceName,
+            StringComparison.OrdinalIgnoreCase);
+        _currentScreen = screen;
+
+        if (!_settings.AutoDetectSteamGameMonitor)
+        {
+            _settings.SelectedMonitorDeviceName = screen.DeviceName;
+        }
+
+        if (changed)
+        {
+            _overlayForm.SetTargetScreen(screen);
+        }
+
+        ApplyOverlayState();
+        UpdateMenuState();
+    }
+
+    private void ApplyOverlayState()
+    {
+        if (_settings.OverlayEnabled)
+        {
+            if (!_overlayForm.Visible)
+            {
+                _overlayForm.Show();
+            }
+            else
+            {
+                _overlayForm.Invalidate();
+            }
+        }
+        else if (_overlayForm.Visible)
+        {
+            _overlayForm.Hide();
+        }
+    }
+
+    private void RebuildMonitorMenu()
+    {
+        _monitorMenuItems.Clear();
+        _monitorsMenuItem.DropDownItems.Clear();
+
+        foreach (var screen in Screen.AllScreens)
+        {
+            var item = new ToolStripMenuItem(
+                DisplayInfoFormatter.ToDisplayLabel(screen),
+                null,
+                (_, _) => SelectManualMonitor(screen.DeviceName))
+            {
+                ForeColor = DarkUiTheme.PrimaryText
+            };
+            _monitorMenuItems[screen.DeviceName] = item;
+            _monitorsMenuItem.DropDownItems.Add(item);
+        }
+
+        _monitorsMenuItem.DropDown.BackColor = DarkUiTheme.CardBackground;
+        _monitorsMenuItem.DropDown.ForeColor = DarkUiTheme.PrimaryText;
+        _monitorsMenuItem.DropDown.Renderer = _trayMenu.Renderer;
+
+        UpdateMenuState();
+    }
+
+    private void ConfigureTrayMenu()
+    {
+        _trayMenu.BackColor = DarkUiTheme.CardBackground;
+        _trayMenu.ForeColor = DarkUiTheme.PrimaryText;
+        _trayMenu.Renderer = new ToolStripProfessionalRenderer(new DarkToolStripColorTable());
+        _trayMenu.ShowCheckMargin = true;
+        _trayMenu.ShowImageMargin = false;
+
+        foreach (ToolStripItem item in _trayMenu.Items)
+        {
+            item.ForeColor = DarkUiTheme.PrimaryText;
+        }
+    }
+
+    private void UpdateMenuState()
+    {
+        _toggleOverlayMenuItem.Checked = _settings.OverlayEnabled;
+        _autoTargetMenuItem.Checked = _settings.AutoDetectSteamGameMonitor;
+
+        foreach (var item in _monitorMenuItems)
+        {
+            item.Value.Checked = !_settings.AutoDetectSteamGameMonitor
+                && string.Equals(item.Key, _currentScreen.DeviceName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var mode = _settings.AutoDetectSteamGameMonitor && _detectedGame is not null
+            ? $"Auto: {_detectedGame.ProcessName}"
+            : DisplayInfoFormatter.ToDisplayLabel(_currentScreen);
+        var text = $"Sound Direction Visualizer - {mode}";
+        _notifyIcon.Text = text.Length > 63 ? text[..63] : text;
+    }
+
+    private void HandleForegroundWindowChanged(
+        IntPtr hook,
+        uint eventType,
+        IntPtr windowHandle,
+        int objectId,
+        int childId,
+        uint eventThread,
+        uint eventTime)
+    {
+        if (_isExiting
+            || !NeedsSteamGameDetection
+            || _uiDispatcher.IsDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            _uiDispatcher.BeginInvoke(new MethodInvoker(() => RefreshTargetScreen(force: true)));
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void HandleDisplaySettingsChanged(object? sender, EventArgs eventArgs)
+    {
+        RebuildMonitorMenu();
+        RefreshTargetScreen(force: true);
+    }
+
+    private void HandleNotifyIconMouseClick(object? sender, MouseEventArgs eventArgs)
+    {
+        if (eventArgs.Button == MouseButtons.Left)
+        {
+            OpenSettings();
+        }
+    }
+
+    private void HandleStartupSettingsTimerTick(object? sender, EventArgs eventArgs)
+    {
+        if (_startupSettingsTimer is null)
+        {
+            return;
+        }
+
+        _startupSettingsTimer.Stop();
+        _startupSettingsTimer.Tick -= HandleStartupSettingsTimerTick;
+        OpenSettings();
+    }
+
+    private void ShowStartupHint()
+    {
+        _notifyIcon.ShowBalloonTip(
+            4500,
+            "Sound Direction Visualizer is running",
+            $"Toggle: {_settings.ToggleHotkey.ToDisplayString()} | Settings: {_settings.OpenSettingsHotkey.ToDisplayString()}",
+            ToolTipIcon.Info);
+    }
+
+    private void PersistSettings()
+    {
+        _settings.Normalize();
+        if (_externalSave is not null)
+        {
+            _externalSave(_settings.Clone());
+        }
+        else
+        {
+            _settingsStore.Save(_settings);
+        }
+    }
+
+    public void SetHotkeys(
+        HotkeyDefinition toggle,
+        HotkeyDefinition cycleMonitor,
+        HotkeyDefinition openSettings)
+    {
+        _settings.ToggleHotkey = toggle.Clone();
+        _settings.CycleMonitorHotkey = cycleMonitor.Clone();
+        _settings.OpenSettingsHotkey = openSettings.Clone();
+        PersistSettings();
+    }
+
+    public void ExitApplication()
+    {
+        _isExiting = true;
+        _notifyIcon.Visible = false;
+        ExitThread();
+    }
+
+    protected override void ExitThreadCore()
+    {
+        _isExiting = true;
+        _audioCaptureGeneration++;
+        _openSettingsRegistration.Unregister(null);
+        _startupSettingsTimer?.Stop();
+        if (_startupSettingsTimer is not null)
+        {
+            _startupSettingsTimer.Tick -= HandleStartupSettingsTimerTick;
+            _startupSettingsTimer.Dispose();
+        }
+
+        _renderTimer.Stop();
+        _targetRefreshTimer.Stop();
+        _renderTimer.Dispose();
+        _targetRefreshTimer.Dispose();
+
+        if (_foregroundWindowHook != IntPtr.Zero)
+        {
+            _ = NativeMethods.UnhookWinEvent(_foregroundWindowHook);
+            _foregroundWindowHook = IntPtr.Zero;
+        }
+
+        _audioCapture.FrameAvailable -= HandleDirectionFrame;
+        _audioCapture.ChannelLevelsAvailable -= HandleAudioChannelLevels;
+        _audioCapture.CaptureFailed -= HandleCaptureFailed;
+        _audioCapture.CaptureStatusChanged -= HandleCaptureStatusChanged;
+        _audioCapture.Dispose();
+        _hotkeyManager.Dispose();
+        _overlayForm.Dispose();
+        _uiDispatcher.Dispose();
+        _notifyIcon.Dispose();
+        _trayIcon.Dispose();
+        _trayMenu.Dispose();
+        SystemEvents.DisplaySettingsChanged -= HandleDisplaySettingsChanged;
+        base.ExitThreadCore();
+    }
+
+    private static Icon LoadTrayIcon()
+    {
+        try
+        {
+            var extracted = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (extracted is not null)
+            {
+                return (Icon)extracted.Clone();
+            }
+        }
+        catch
+        {
+        }
+
+        return (Icon)SystemIcons.Application.Clone();
+    }
+}

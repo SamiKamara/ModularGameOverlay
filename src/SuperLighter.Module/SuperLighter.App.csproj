@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>SuperLighter</AssemblyName>
+    <RootNamespace>SuperLighter.App</RootNamespace>
+    <Product>SuperLighter</Product>
+    <Description>Always-on-top brightness, contrast, gamma, and saturation enhancement for Windows.</Description>
+    <Version>1.3.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\SuperLighter.ico" LogicalName="SuperLighter.App.Assets.SuperLighter.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Program.cs" />
+  </ItemGroup>
+
+</Project>

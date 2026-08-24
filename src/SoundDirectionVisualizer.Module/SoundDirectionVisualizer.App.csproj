@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>SoundDirectionVisualizer</AssemblyName>
+    <Product>Sound Direction Visualizer</Product>
+    <Description>Windows accessibility overlay for visualizing best-available stereo and multichannel sound direction.</Description>
+    <Authors>SamiKamara</Authors>
+    <Version>1.0.2</Version>
+    <RepositoryUrl>https://github.com/SamiKamara/SoundDirectionVisualizer</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="3.0.0-preview.20" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SoundDirectionVisualizer.Core\SoundDirectionVisualizer.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="SoundDirectionVisualizer.App.Tests" />
+    <InternalsVisibleTo Include="ModularGameOverlay.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Program.cs" />
+  </ItemGroup>
+</Project>
