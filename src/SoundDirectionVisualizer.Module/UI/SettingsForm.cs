@@ -86,7 +86,7 @@ public sealed class SettingsForm : Form
 
     internal SettingsForm(AppSettings settings, AudioStatusSnapshot statusSnapshot)
     {
-        Text = "Sound Direction Visualizer";
+        Text = "ModularGameOverlay - Sound Direction Visualizer";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(720, 620);
         ClientSize = new Size(920, 780);

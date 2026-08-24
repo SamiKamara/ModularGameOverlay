@@ -5,14 +5,17 @@ namespace ModularGameOverlay.App.UI;
 internal sealed class HotkeysForm : Form
 {
     private readonly Dictionary<OverlayHotkeyAction, HotkeyTextBox> _fields = [];
+    private readonly Icon _windowIcon = AppIcon.Load();
 
     public HotkeysForm(HotkeyConfiguration source)
     {
         Result = source.Clone();
-        Text = "ModularGameOverlay — Global hotkeys";
+        Text = "ModularGameOverlay - Global Hotkeys";
         ClientSize = new Size(650, 506);
         MinimumSize = new Size(590, 470);
         ShowInTaskbar = false;
+        Icon = _windowIcon;
+        ShowIcon = true;
         DarkTheme.ApplyForm(this);
 
         var root = new TableLayoutPanel
@@ -92,6 +95,11 @@ internal sealed class HotkeysForm : Form
 
     internal int BindingFieldCount => _fields.Count;
 
+    internal IReadOnlyList<(Rectangle ClientBounds, Rectangle TextBounds)> BindingTextBounds =>
+        _fields.Values
+            .Select(field => (field.ClientRectangle, field.TextBounds))
+            .ToArray();
+
     private void AddSection(TableLayoutPanel table, string text)
     {
         var row = table.RowCount++;
@@ -165,4 +173,14 @@ internal sealed class HotkeysForm : Form
         "Invalid hotkey",
         MessageBoxButtons.OK,
         MessageBoxIcon.Warning);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _windowIcon.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 }

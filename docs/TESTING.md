@@ -19,13 +19,13 @@ Komento suorittaa seuraavat portit järjestyksessä:
 
 ## Automaattinen kattavuus
 
-23.8.2026 viimeisin paikallinen Release-ajo läpäisi 150 testiä:
+24.8.2026 viimeisin paikallinen Release-ajo läpäisi 152 testiä:
 
 | Suite | Testejä | Keskeinen kattavuus |
 | --- | ---: | --- |
 | SoundDirectionVisualizer.Core.Tests | 62 | stereo- ja multichannel-analyysi, kalibrointi, loudness, trail ja visualisointimallit |
 | SoundDirectionVisualizer.App.Tests | 76 | audio source/fallback/probe, asetukset, UI, näyttö- ja prosessitunnistus |
-| ModularGameOverlay.Tests | 12 | uudet oletukset, migraatio, idempotenssi, osittain virheellinen settings, kanoniset/unbound/duplicate-hotkeyt, kahdeksan kentän keskitetty ikkuna, pääikkunan layout ja SuperLighter-self-test |
+| ModularGameOverlay.Tests | 14 | uudet oletukset, migraatio, idempotenssi, osittain virheellinen settings, kanoniset/unbound/duplicate-hotkeyt, kahdeksan kentän keskitetty ikkuna, hotkey-tekstin pystykeskitys, pääikkunan oikean reunan linjaus, yhteiset otsikot/ikonit, tumma tray-renderöinti ja SuperLighter-self-test |
 
 Release-buildin on oltava 0 warnings / 0 errors. Testejä ei saa ohittaa tai
 heikentää toteutuksen läpiviemiseksi.
@@ -43,6 +43,11 @@ heikentää toteutuksen läpiviemiseksi.
 - [x] Kolme laajaa asetusikkunaa avautuivat hostista ja sulkeutuivat ilman
   tallennusta.
 - [x] Keskitetty hotkey-ikkuna renderöi kahdeksan toimintoa oikeilla oletuksilla.
+- [x] Pääikkunan ja keskitetyn hotkey-ikkunan hotkey-tekstit ovat pysty- ja
+  vaakasuunnassa keskellä; oikean reunan kenttä ja painikkeet ovat samassa
+  linjassa.
+- [x] Kaikki viisi asetusikkunaa käyttävät ModularGameOverlay-otsikkoa ja
+  sovelluskuvaketta, ja tray-valikon check-alue käyttää tummaa renderöintiä.
 - [x] Aimoro- ja SoundDirectionVisualizer-togglet testattiin off/on ja molemmat
   tilat tallentuivat välittömästi yhteiseen settings-tiedostoon.
 - [x] Toinen käynnistys jätti prosessimäärän yhteen ja aktivoi olemassa olevan

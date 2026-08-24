@@ -6,11 +6,15 @@ namespace ModularGameOverlay.App.UI;
 
 internal sealed class MainForm : Form
 {
+    private const int ActionControlWidth = 174;
     private readonly CheckBox _lightEnabled = DarkTheme.CreateToggle("Enhancement enabled");
     private readonly CheckBox _aimoroEnabled = DarkTheme.CreateToggle("Reticle enabled");
     private readonly CheckBox _soundEnabled = DarkTheme.CreateToggle("Direction overlay enabled");
     private readonly HotkeyTextBox _lightHotkey = new();
     private readonly Label _status = new();
+    private readonly Button _allHotkeysButton;
+    private readonly List<Button> _detailedSettingsButtons = [];
+    private readonly Icon _windowIcon = AppIcon.Load();
     private readonly Action<bool> _setLightEnabled;
     private readonly Action<bool> _setAimoroEnabled;
     private readonly Action<bool> _setSoundEnabled;
@@ -35,9 +39,9 @@ internal sealed class MainForm : Form
         _setLightHotkey = setLightHotkey;
 
         Text = "ModularGameOverlay";
-        ClientSize = new Size(720, 650);
+        ClientSize = new Size(720, 680);
         MinimumSize = new Size(660, 600);
-        Icon = AppIcon.Load();
+        Icon = _windowIcon;
         DarkTheme.ApplyForm(this);
 
         var root = new TableLayoutPanel
@@ -56,28 +60,14 @@ internal sealed class MainForm : Form
         }
         Controls.Add(root);
 
-        var titlePanel = new TableLayoutPanel
+        root.Controls.Add(new Label
         {
             AutoSize = true,
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
+            Text = "Modules:",
+            Font = new Font("Segoe UI Semibold", 18f),
+            ForeColor = DarkTheme.Text,
             Margin = new Padding(0, 0, 0, 18)
-        };
-        titlePanel.Controls.Add(new Label
-        {
-            AutoSize = true,
-            Text = "ModularGameOverlay",
-            Font = new Font("Segoe UI Semibold", 21f),
-            ForeColor = DarkTheme.Text
         });
-        titlePanel.Controls.Add(new Label
-        {
-            AutoSize = true,
-            Text = "One control surface for your game overlays",
-            ForeColor = DarkTheme.Muted,
-            Margin = new Padding(2, 2, 0, 0)
-        });
-        root.Controls.Add(titlePanel);
 
         _lightEnabled.AccessibleName = "SuperLighter enhancement enabled";
         _aimoroEnabled.AccessibleName = "Aimoro reticle enabled";
@@ -90,7 +80,8 @@ internal sealed class MainForm : Form
             "Gamma, contrast, saturation, overlay brightness and monitor brightness.",
             _lightEnabled,
             openSuperLighterSettings,
-            CreateLightHotkeyRow()));
+            "Toggle Light Enhancement hotkey",
+            _lightHotkey));
         root.Controls.Add(CreateModuleCard(
             "AIMORO",
             "Reticle overlay",
@@ -109,7 +100,8 @@ internal sealed class MainForm : Form
             AutoSize = true,
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            Margin = new Padding(0, 16, 0, 0)
+            Margin = new Padding(0, 16, 0, 0),
+            Padding = new Padding(18, 0, 18, 0)
         };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -117,10 +109,10 @@ internal sealed class MainForm : Form
         _status.ForeColor = DarkTheme.Muted;
         _status.Padding = new Padding(0, 10, 12, 0);
         footer.Controls.Add(_status, 0, 0);
-        var hotkeys = DarkTheme.CreateButton("All global hotkeys...", primary: true);
-        hotkeys.AccessibleName = "Open all global hotkeys";
-        hotkeys.Click += (_, _) => openHotkeys();
-        footer.Controls.Add(hotkeys, 1, 0);
+        _allHotkeysButton = CreateActionButton("All global hotkeys...");
+        _allHotkeysButton.AccessibleName = "Open all global hotkeys";
+        _allHotkeysButton.Click += (_, _) => openHotkeys();
+        footer.Controls.Add(_allHotkeysButton, 1, 0);
         root.Controls.Add(footer);
 
         _lightEnabled.CheckedChanged += (_, _) =>
@@ -190,42 +182,28 @@ internal sealed class MainForm : Form
         _soundEnabled.Checked,
         _lightHotkey.Hotkey,
         Descendants<Button>(this).Select(button => button.Text).ToArray(),
-        Descendants<Control>(this).Count(control => control.Height > 0));
+        Descendants<Control>(this).Count(control => control.Height > 0),
+        Descendants<Label>(this).Select(label => label.Text).ToArray(),
+        GetBoundsRelativeToForm(_lightHotkey),
+        _detailedSettingsButtons.Select(GetBoundsRelativeToForm).ToArray(),
+        GetBoundsRelativeToForm(_allHotkeysButton),
+        _allHotkeysButton.BackColor);
 
-    private Control CreateLightHotkeyRow()
-    {
-        var panel = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Margin = new Padding(0, 10, 0, 0)
-        };
-        panel.Controls.Add(new Label
-        {
-            AutoSize = true,
-            Text = "Toggle Light Enhancement",
-            ForeColor = DarkTheme.Muted,
-            Padding = new Padding(0, 7, 12, 0)
-        });
-        panel.Controls.Add(_lightHotkey);
-        return panel;
-    }
-
-    private static Control CreateModuleCard(
+    private Control CreateModuleCard(
         string eyebrow,
         string title,
         string description,
         CheckBox toggle,
         Action openSettings,
-        Control? extra = null)
+        string? extraLabel = null,
+        Control? extraControl = null)
     {
         var card = new TableLayoutPanel
         {
             AutoSize = true,
             Dock = DockStyle.Top,
             ColumnCount = 2,
-            RowCount = 4,
+            RowCount = extraControl is null ? 4 : 5,
             BackColor = DarkTheme.Card,
             Padding = new Padding(18, 14, 18, 14),
             Margin = new Padding(0, 0, 0, 12)
@@ -240,12 +218,12 @@ internal sealed class MainForm : Form
             Font = new Font("Segoe UI Semibold", 8f)
         };
         card.Controls.Add(eyebrowLabel, 0, 0);
-        var settings = DarkTheme.CreateButton("Detailed settings...");
+        var settings = CreateActionButton("Detailed settings...");
         settings.AccessibleName = $"Open {title} detailed settings";
         settings.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         settings.Click += (_, _) => openSettings();
+        _detailedSettingsButtons.Add(settings);
         card.Controls.Add(settings, 1, 0);
-        card.SetRowSpan(settings, 4);
         card.Controls.Add(new Label
         {
             AutoSize = true,
@@ -263,24 +241,45 @@ internal sealed class MainForm : Form
             Margin = new Padding(0, 3, 14, 8)
         }, 0, 2);
         toggle.Margin = new Padding(0, 3, 14, 0);
-        if (extra is null)
+        card.Controls.Add(toggle, 0, 3);
+        if (extraControl is not null)
         {
-            card.Controls.Add(toggle, 0, 3);
-        }
-        else
-        {
-            var bottom = new FlowLayoutPanel
+            card.Controls.Add(new Label
             {
                 AutoSize = true,
-                FlowDirection = FlowDirection.TopDown,
-                WrapContents = false,
-                Margin = Padding.Empty
-            };
-            bottom.Controls.Add(toggle);
-            bottom.Controls.Add(extra);
-            card.Controls.Add(bottom, 0, 3);
+                Text = extraLabel,
+                ForeColor = DarkTheme.Muted,
+                Padding = new Padding(0, 7, 12, 0),
+                Margin = new Padding(0, 10, 14, 0)
+            }, 0, 4);
+            extraControl.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            extraControl.Margin = new Padding(0, 10, 0, 0);
+            extraControl.Size = new Size(ActionControlWidth, 32);
+            card.Controls.Add(extraControl, 1, 4);
         }
         return card;
+    }
+
+    private static Button CreateActionButton(string text)
+    {
+        var button = DarkTheme.CreateButton(text);
+        button.AutoSize = false;
+        button.Margin = Padding.Empty;
+        button.Size = new Size(ActionControlWidth, 38);
+        return button;
+    }
+
+    private Rectangle GetBoundsRelativeToForm(Control control)
+    {
+        var topLeft = control.Location;
+        var parent = control.Parent;
+        while (parent is not null && parent != this)
+        {
+            topLeft.Offset(parent.Location);
+            parent = parent.Parent;
+        }
+
+        return new Rectangle(topLeft, control.Size);
     }
 
     private void HandleFormClosing(object? sender, FormClosingEventArgs eventArgs)
@@ -302,6 +301,16 @@ internal sealed class MainForm : Form
             foreach (var nested in Descendants<T>(child)) yield return nested;
         }
     }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _windowIcon.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 }
 
 internal sealed record MainFormState(
@@ -310,4 +319,9 @@ internal sealed record MainFormState(
     bool SoundEnabled,
     HotkeyBinding LightHotkey,
     IReadOnlyList<string> ButtonLabels,
-    int VisibleContentControlCount);
+    int VisibleContentControlCount,
+    IReadOnlyList<string> LabelTexts,
+    Rectangle LightHotkeyBounds,
+    IReadOnlyList<Rectangle> DetailedSettingsButtonBounds,
+    Rectangle GlobalHotkeysButtonBounds,
+    Color GlobalHotkeysButtonBackColor);

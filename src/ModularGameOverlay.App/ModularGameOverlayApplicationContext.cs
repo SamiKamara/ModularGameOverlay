@@ -474,15 +474,33 @@ internal sealed class ModularGameOverlayApplicationContext : ApplicationContext
         base.Dispose(disposing);
     }
 
-    private static void ConfigureTrayMenu(ContextMenuStrip menu)
+    internal static void ConfigureTrayMenu(ContextMenuStrip menu)
     {
         menu.BackColor = DarkTheme.Card;
         menu.ForeColor = DarkTheme.Text;
         menu.ShowCheckMargin = true;
         menu.ShowImageMargin = false;
-        foreach (ToolStripItem item in menu.Items)
+        var renderer = new DarkToolStripRenderer();
+        menu.Renderer = renderer;
+        ConfigureTrayItems(menu.Items, renderer);
+    }
+
+    private static void ConfigureTrayItems(
+        ToolStripItemCollection items,
+        ToolStripRenderer renderer)
+    {
+        foreach (ToolStripItem item in items)
         {
             item.ForeColor = DarkTheme.Text;
+            if (item is not ToolStripMenuItem menuItem || !menuItem.HasDropDownItems)
+            {
+                continue;
+            }
+
+            menuItem.DropDown.BackColor = DarkTheme.Card;
+            menuItem.DropDown.ForeColor = DarkTheme.Text;
+            menuItem.DropDown.Renderer = renderer;
+            ConfigureTrayItems(menuItem.DropDownItems, renderer);
         }
     }
 }

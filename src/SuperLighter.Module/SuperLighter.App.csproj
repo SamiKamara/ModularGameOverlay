@@ -21,4 +21,8 @@
     <Compile Remove="Program.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ModularGameOverlay.Tests" />
+  </ItemGroup>
+
 </Project>

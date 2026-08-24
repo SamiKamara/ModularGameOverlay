@@ -5,6 +5,7 @@ namespace Aimoro.App.UI;
 
 public sealed class SettingsForm : Form
 {
+    private readonly Icon _windowIcon = LoadWindowIcon();
     private readonly Panel _scrollPanel = new()
     {
         Dock = DockStyle.Fill,
@@ -86,7 +87,7 @@ public sealed class SettingsForm : Form
         _selectedColor = ColorTranslator.FromHtml(settings.ReticleColorHex);
         _selectedOutlineColor = ColorTranslator.FromHtml(settings.ReticleOutlineColorHex);
 
-        Text = "Aimoro Settings";
+        Text = "ModularGameOverlay - Aimoro";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -97,6 +98,8 @@ public sealed class SettingsForm : Form
         ForeColor = DarkUiTheme.PrimaryText;
         Font = new Font("Segoe UI", 9.25F, FontStyle.Regular, GraphicsUnit.Point);
         ClientSize = new Size(570, 720);
+        Icon = _windowIcon;
+        ShowIcon = true;
 
         BuildLayout();
         DarkUiTheme.ApplyTo(this);
@@ -777,6 +780,33 @@ public sealed class SettingsForm : Form
 
         var duplicatedActions = string.Join(", ", duplicateGroup.Select(entry => entry.Label));
         return $"These actions are using the same hotkey ({duplicateGroup.Key}): {duplicatedActions}. Pick different shortcuts.";
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _windowIcon.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    private static Icon LoadWindowIcon()
+    {
+        try
+        {
+            var extracted = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (extracted is not null)
+            {
+                return (Icon)extracted.Clone();
+            }
+        }
+        catch
+        {
+        }
+
+        return (Icon)SystemIcons.Application.Clone();
     }
 
     private sealed record DisplayOption(string DeviceName, string Label)

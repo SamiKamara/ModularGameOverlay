@@ -32,6 +32,11 @@ Pääikkunassa voi:
 - avata jokaisen moduulin alkuperäistä vastaavat laajat asetukset;
 - avata kaikki kahdeksan nykyistä hotkey-toimintoa keskitettyyn ikkunaan.
 
+Pääikkunan oikean reunan hotkey- ja asetusohjaimet käyttävät yhteistä linjausta.
+Kaikki asetusikkunat käyttävät `ModularGameOverlay - ...` -otsikointia,
+sovelluksen kuvaketta ja tummaa visuaalista kieltä; sama koskee tray-valikkoa ja
+sen valintamerkkejä.
+
 Ensimmäisellä käynnistyksellä sovellus migroi yksityiskohtaiset asetukset
 vanhoista `%AppData%`-tiedostoista uuteen tiedostoon:
 

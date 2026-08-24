@@ -49,7 +49,7 @@ internal sealed class SettingsForm : Form
     private readonly List<Label> _wrappingLabels = [];
     private readonly System.Windows.Forms.Timer _previewTimer = new() { Interval = 90 };
     private readonly System.Windows.Forms.Timer _monitorBrightnessTimer = new() { Interval = 120 };
-    private readonly Icon _windowIcon = AppIcon.Load();
+    private readonly Icon _windowIcon = LoadWindowIcon();
     private bool _saved;
 
     public AppSettings ResultSettings { get; private set; }
@@ -66,7 +66,7 @@ internal sealed class SettingsForm : Form
         _preview = preview;
         _setMonitorBrightness = setMonitorBrightness ?? ((_, _) => false);
 
-        Text = "SuperLighter";
+        Text = "ModularGameOverlay - SuperLighter";
         AutoScaleMode = AutoScaleMode.Dpi;
         BackColor = WindowBackground;
         ForeColor = PrimaryText;
@@ -749,5 +749,22 @@ internal sealed class SettingsForm : Form
         }
 
         base.Dispose(disposing);
+    }
+
+    private static Icon LoadWindowIcon()
+    {
+        try
+        {
+            var extracted = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            if (extracted is not null)
+            {
+                return (Icon)extracted.Clone();
+            }
+        }
+        catch
+        {
+        }
+
+        return AppIcon.Load();
     }
 }

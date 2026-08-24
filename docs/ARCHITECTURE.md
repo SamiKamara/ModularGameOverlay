@@ -56,6 +56,18 @@ syötön ajaksi. Kun ikkuna sulkeutuu, moduulin asetukset sovitetaan kanoniseen
 konfiguraatioon, mahdollinen cross-module-duplikaatti hylätään ja hotkeyt
 rekisteröidään uudelleen.
 
+## Yhteinen ikkuna- ja valikkokieli
+
+Hostin omistajapiirretty hotkey-kontrolli keskittää sidonnan tai `Not set`
+-tekstin molempiin suuntiin. Pääikkunan oikean reunan hotkey-kenttä, kaikki
+Detailed settings -painikkeet ja keskitetyn hotkey-ikkunan painike käyttävät
+samaa leveyttä ja oikeaa linjaa. Hostin ja moduulien asetusikkunoiden titlebarit
+käyttävät ModularGameOverlay-otsikointia ja käynnissä olevan host-EXE:n kuvaketta.
+
+Tray-valikko käyttää hostin omaa `ToolStripProfessionalRenderer`-toteutusta.
+Tausta, valintatila, separatorit, check-ruutu ja check-merkki piirretään kaikki
+yhteisen tumman paletin väreillä myös sisäkkäisissä valikoissa.
+
 ## Moduulien deaktivointi
 
 - SuperLighter piilottaa brightness-overlayn ja palauttaa gamma- sekä

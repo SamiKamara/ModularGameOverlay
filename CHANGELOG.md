@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Centered the shared hotkey field text vertically in both the main and global
+  hotkey windows.
+- Clarified the main Light Enhancement field label by naming it explicitly as a
+  hotkey.
+- Aligned the main window's hotkey field and dark secondary action buttons on a
+  consistent right-hand grid.
+- Simplified the main heading to `Modules:` and unified all settings-window
+  titles and icons under ModularGameOverlay.
+- Added a complete dark renderer, including checked-item glyphs, to the host
+  tray menu.
+
 ## 0.1.0 - 2026-08-23
 
 - Added the unified ModularGameOverlay WinForms and tray host.
