@@ -1,6 +1,28 @@
 # Changelog
 
-## Unreleased
+All notable ModularGameOverlay changes are documented here. Versions follow
+semantic versioning.
+
+## [Unreleased]
+
+## [0.1.0] - 2026-08-24
+
+### Added
+
+- Unified ModularGameOverlay WinForms and notification-area host.
+- In-process SuperLighter, Aimoro, and SoundDirectionVisualizer modules.
+- One settings file with first-run migration from all three legacy apps.
+- Documented module defaults and unbound-by-default hotkeys except `Ctrl+Alt+B`.
+- Simple dark control panel and centralized eight-action hotkey editor.
+- Preserved detailed module settings windows and SoundDirectionVisualizer test
+  suites.
+- Four-color SVG, PNG, and ICO application assets.
+- Verified single-file Windows x64 build, test, publish, and desktop-shortcut
+  workflow.
+- Tag-driven GitHub Release tooling with release assets, licensing notices, and
+  SHA-256 checksums.
+
+### Changed
 
 - Centered the shared hotkey field text vertically in both the main and global
   hotkey windows.
@@ -11,15 +33,7 @@
 - Simplified the main heading to `Modules:` and unified all settings-window
   titles and icons under ModularGameOverlay.
 - Added a complete dark renderer, including checked-item glyphs, to the host
-  tray menu.
+  notification-area menu.
 
-## 0.1.0 - 2026-08-23
-
-- Added the unified ModularGameOverlay WinForms and tray host.
-- Imported SuperLighter, Aimoro, and SoundDirectionVisualizer as in-process modules.
-- Added one settings file with first-run migration from all three legacy apps.
-- Added documented module defaults and unbound-by-default hotkeys except `Ctrl+Alt+B`.
-- Added the simple dark control panel and centralized eight-action hotkey editor.
-- Preserved the three detailed settings windows and SoundDirectionVisualizer test suites.
-- Added a four-color SVG/PNG/ICO application icon.
-- Added a verified single-file Windows x64 build, test, publish, and desktop-shortcut workflow.
+[Unreleased]: https://github.com/SamiKamara/ModularGameOverlay/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/SamiKamara/ModularGameOverlay/releases/tag/v0.1.0

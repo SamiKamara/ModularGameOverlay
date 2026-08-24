@@ -4,76 +4,121 @@
   <img src="src/ModularGameOverlay.App/Assets/ModularGameOverlay.png" alt="ModularGameOverlay icon" width="112" height="112">
 </p>
 
-ModularGameOverlay yhdistää SuperLighterin, Aimoron ja
-SoundDirectionVisualizerin yhdeksi Windows-overlay-apusovellukseksi. Yksi
-host-prosessi tarjoaa yhden tray-kuvakkeen, yksinkertaisen pääikkunan, kolme
-moduulikohtaista laajaa asetusikkunaa ja keskitetyt globaalit pikanäppäimet.
+ModularGameOverlay combines SuperLighter, Aimoro, and
+SoundDirectionVisualizer into one Windows game-overlay utility. A single host
+process provides one notification-area icon, a simple control panel, three
+detailed module settings windows, and centralized global hotkeys.
 
-## Paikallinen testibuild
+## Download
 
-Uusin self-contained Windows x64 -build löytyy tämän repositoryn paikallisesta
-polusta:
+Tagged builds are published on the
+[GitHub Releases page](https://github.com/SamiKamara/ModularGameOverlay/releases).
+After the first release, the newest ready-to-run build is always available from
+the [latest release](https://github.com/SamiKamara/ModularGameOverlay/releases/latest)
+or from the stable
+[Windows x64 download](https://github.com/SamiKamara/ModularGameOverlay/releases/latest/download/ModularGameOverlay-win-x64.exe).
 
-```text
-artifacts\publish\win-x64\ModularGameOverlay.exe
-```
+The release executable is self-contained and does not require a separate .NET
+installation. Download `SHA256SUMS.txt` from the same release to verify it.
+Releases also include the application license and bundled third-party notices.
+The executable is not currently code-signed, so Windows SmartScreen may show an
+unknown-publisher warning.
 
-Tällä kehityslaitteella työpöydän `ModularGameOverlay.lnk` osoittaa aina samaan
-uusimpaan varmennettuun buildiin. Sovellus jää pääikkunan sulkemisen jälkeen
-trayhin; lopeta se tray-valikon **Exit**-toiminnolla.
+Requirements:
 
-## Käyttö
+- Windows 10 or Windows 11, x64;
+- .NET 9 SDK only when building from source.
 
-Pääikkunassa voi:
+Direct detected-game process audio capture requires Windows 10 version 2004
+(build 19041) or newer. If direct activation is unavailable, the sound module
+retains its selected/default-output stereo fallback.
 
-- kytkeä SuperLighterin enhancementin, Aimoron reticlen ja äänen suunnan
-  overlayn päälle tai pois;
-- säätää tärkeän Light Enhancement -toiminnon hotkeyn suoraan;
-- avata jokaisen moduulin alkuperäistä vastaavat laajat asetukset;
-- avata kaikki kahdeksan nykyistä hotkey-toimintoa keskitettyyn ikkunaan.
+## Usage
 
-Pääikkunan oikean reunan hotkey- ja asetusohjaimet käyttävät yhteistä linjausta.
-Kaikki asetusikkunat käyttävät `ModularGameOverlay - ...` -otsikointia,
-sovelluksen kuvaketta ja tummaa visuaalista kieltä; sama koskee tray-valikkoa ja
-sen valintamerkkejä.
+The main window lets you:
 
-Ensimmäisellä käynnistyksellä sovellus migroi yksityiskohtaiset asetukset
-vanhoista `%AppData%`-tiedostoista uuteen tiedostoon:
+- enable or disable SuperLighter enhancement, the Aimoro reticle, and the sound
+  direction overlay;
+- edit the important Light Enhancement hotkey directly;
+- open the original-style detailed settings for every module;
+- edit all eight current hotkey actions in one centralized window.
+
+The right-side hotkey and settings controls share a consistent alignment. Every
+settings window uses `ModularGameOverlay - ...` titles, the application icon,
+and a dark visual language; the notification-area menu and its check marks use
+the same theme.
+
+On first launch, the application migrates detailed settings from the legacy
+files into:
 
 ```text
 %AppData%\ModularGameOverlay\settings.json
 ```
 
-Vanhat asetustiedostot säilyvät muuttumattomina. Vain Light Enhancementin
-`Ctrl+Alt+B` on oletuksena sidottu; muut seitsemän hotkeytä ovat unbound.
+The legacy files remain unchanged. Only Light Enhancement's `Ctrl+Alt+B` is
+bound by default; the other seven hotkeys start unbound.
 
-## Build ja testit
+Closing the main window leaves the application running in the notification
+area. Use **Exit** from that menu to stop the host and all modules cleanly.
 
-Kaikki paikallisen buildin, testien, publishin ja työpöytäpikakuvakkeen vaiheet
-ajetaan yhdellä komennolla:
+## Local build, test, and publish
+
+On the configured development machine, run the complete verification and local
+publish pipeline with:
 
 ```powershell
 .\scripts\build-and-publish.ps1
 ```
 
-Putki ajaa Release-restoren, varoituksettoman buildin, kaikki kolme testisuitea,
-self-contained single-file publishin, publish-hakemiston puhdistuksen sekä
-pikakuvakkeen target- ja SHA-256-varmennuksen.
+The script restores dependencies, verifies formatting, performs a warning-free
+Release build, runs all three test suites, creates a self-contained single-file
+Windows x64 publish, and verifies the configured desktop shortcut and SHA-256
+hash. The canonical local executable is:
 
-Kuvakeassetit voi generoida master-SVG:n geometriasta Pillowlla:
+```text
+artifacts\publish\win-x64\ModularGameOverlay.exe
+```
+
+Application icon assets can be regenerated from the master SVG geometry with:
 
 ```powershell
 python .\scripts\generate-icon-assets.py
 ```
 
-## Dokumentaatio
+## GitHub Releases
 
-- [Tavoite ja suunnitelma](docs/TAVOITE-JA-SUUNNITELMA.md)
-- [Arkkitehtuuri](docs/ARCHITECTURE.md)
-- [Lähdesovellusten parity](docs/PARITY.md)
-- [Testaus ja käyttäjän smoke-testi](docs/TESTING.md)
-- [Lähtötason varmennus](docs/BASELINE.md)
+GitHub Releases are built from immutable `vMAJOR.MINOR.PATCH` tags by GitHub
+Actions, using the same release verification and asset contract as
+SoundDirectionVisualizer. To verify release assets locally for the current
+project version:
 
-Kaikkien projektiin osallistuvien ihmisten ja agenttien on luettava
-[AGENTS.md](AGENTS.md) ennen muutosten tekemistä. Dokumentaatio ja testit ovat
-ylläpidettävä osa toteutusta.
+```powershell
+.\scripts\build-release.ps1 -Version 0.1.0
+```
+
+From a clean, synchronized `main`, maintainers can validate, tag, and push a
+release with:
+
+```powershell
+.\scripts\create-release.ps1 -Version 0.1.0 -Push
+```
+
+See [the release guide](docs/RELEASING.md) before creating a tag. It documents
+version and changelog preparation, generated assets, workflow monitoring,
+manual reruns, checksum verification, and the current signing status.
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Source application baseline](docs/BASELINE.md)
+- [Feature parity](docs/PARITY.md)
+- [Testing and manual smoke tests](docs/TESTING.md)
+- [Release process](docs/RELEASING.md)
+
+Every human and agent contributing to the project must read
+[AGENTS.md](AGENTS.md) before making changes. Documentation and tests are
+maintained product contracts.
+
+## License
+
+ModularGameOverlay is available under the [MIT License](LICENSE).

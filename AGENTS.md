@@ -1,7 +1,8 @@
 # Repository instructions
 
-- Read `README.md`, `docs/TAVOITE-JA-SUUNNITELMA.md`, and the task-relevant
-  documentation before changing behavior.
+- Read `README.md` and the task-relevant tracked documentation before changing
+  behavior. If the local `docs/TAVOITE-JA-SUUNNITELMA.md` plan exists, read it
+  as additional project context; it is intentionally not distributed.
 - Treat project documentation and tests as maintained product contracts. Every
   accepted user-visible behavior, limitation, settings-schema, architecture, or
   workflow change requires matching documentation and relevant tests in the same
@@ -13,10 +14,10 @@
 - These rules apply to every contributor, including human developers and agents.
   Hand off work only after relevant tests have run, documentation matches the
   result, and any known limitation is recorded.
-- Preserve the source applications' behavior unless
-  `docs/TAVOITE-JA-SUUNNITELMA.md` explicitly changes it. Use the original
-  SuperLighter, Aimoro, and SoundDirectionVisualizer repositories as read-only
-  parity references unless the user separately asks to modify them.
+- Preserve the source applications' behavior unless tracked documentation or an
+  accepted user request explicitly changes it. Use the original SuperLighter,
+  Aimoro, and SoundDirectionVisualizer repositories as read-only parity
+  references unless the user separately asks to modify them.
 - Keep the imported SoundDirectionVisualizer core logic platform-independent and
   deterministic. Preserve its existing test coverage, explicit stereo
   front/back ambiguity, and full multichannel handling.

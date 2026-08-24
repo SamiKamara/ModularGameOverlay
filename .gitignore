@@ -17,6 +17,9 @@ coverage/
 # Local machine and agent instructions
 AGENTS.local.md
 
+# Local planning documents
+docs/TAVOITE-JA-SUUNNITELMA.md
+
 # Local settings, logs, and temporary files
 *.log
 *.tmp

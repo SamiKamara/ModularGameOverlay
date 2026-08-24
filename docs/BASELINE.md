@@ -1,20 +1,19 @@
-# Lähdesovellusten baseline
+# Source application baseline
 
-Baseline varmistettiin 23.8.2026 ennen moduulien porttausta. Vanhoihin
-repositoryihin ei tehty muutoksia.
+The baseline was verified on 2026-08-23 before porting the modules. The legacy
+repositories were not modified.
 
-| Sovellus | Commit | Varmennus | Tulos |
+| Application | Commit | Verification | Result |
 | --- | --- | --- | --- |
-| SuperLighter | `71638eb` / `v1.3.0` | `dotnet build .\SuperLighter.sln -c Release` ja `--self-test` | 0 varoitusta, 0 virhettä, self-test läpi |
-| Aimoro | `fc734ba` | `dotnet build .\Aimoro.sln -c Release` | 0 varoitusta, 0 virhettä; lähteessä ei ollut testiprojektia |
-| SoundDirectionVisualizer | `cfbcf28` | `dotnet test .\SoundDirectionVisualizer.sln --configuration Release` | Core 62/62 ja App 76/76 testiä läpi |
+| SuperLighter | `71638eb` / `v1.3.0` | `dotnet build .\SuperLighter.sln -c Release` and `--self-test` | 0 warnings, 0 errors, self-test passed |
+| Aimoro | `fc734ba` | `dotnet build .\Aimoro.sln -c Release` | 0 warnings, 0 errors; the source had no test project |
+| SoundDirectionVisualizer | `cfbcf28` | `dotnet test .\SoundDirectionVisualizer.sln --configuration Release` | Core 62/62 and App 76/76 tests passed |
 
-Portattu lähdekoodi sijaitsee uuden repositoryn `src`-hakemistossa. Alkuperäiset
-entrypointit säilyvät lähdevertailua varten tiedostoina, mutta ne on poistettu
-moduuliprojektien compile-listasta. `ModularGameOverlay.App` on solutionin ainoa
-ajettava entrypoint.
+The ported source is under this repository's `src` directory. Original entry
+points remain as source references but are excluded from module compilation.
+`ModularGameOverlay.App` is the solution's only executable entry point.
 
-SoundDirectionVisualizerin kaikki 138 automaattista testiä siirrettiin uuden
-solutionin osaksi ilman poistettuja tai ohitettuja testejä. SuperLighterin
-self-test ajetaan lisäksi uuden host-testisuiten kautta STA-threadillä. Aimoron
-kriittiset uudet unbound- ja migraatiokäyttäytymiset on suojattu host-testeillä.
+All 138 SoundDirectionVisualizer automated tests were moved into the combined
+solution without deleting or skipping tests. The SuperLighter self-test also
+runs from the host test suite on an STA thread. Host tests protect Aimoro's
+critical new unbound-hotkey and migration behavior.
