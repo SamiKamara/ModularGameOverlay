@@ -90,8 +90,9 @@ repeated.
 - The application project, dated changelog entry, and tag versions agree.
 - Local release creation starts only from clean `main` matching `origin/main`.
 - Dependencies restore successfully.
-- The build uses the repository-pinned .NET SDK 9.0.312. The release workflow
-  supplies the same selection for older tags that predate `global.json`.
+- The build uses the newest available .NET 9 SDK selected by the repository's
+  `global.json`. The release workflow supplies the same major-version selection
+  for older tags that predate that file.
 - `dotnet format` reports no changes.
 - The Release build has no warnings or errors and all automated tests pass.
 - Publishing produces a self-contained Windows x64 executable without debug

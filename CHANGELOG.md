@@ -7,8 +7,9 @@ semantic versioning.
 
 ### Fixed
 
-- Pinned local and GitHub builds to .NET SDK 9.0.312 so newer runner SDKs cannot
-  silently select a different C# language version.
+- Pinned local and GitHub builds to the .NET 9 SDK family so newer major SDKs
+  cannot silently select a different C# language version while .NET 9 servicing
+  updates remain eligible.
 - Made release changelog validation accept Windows CRLF line endings.
 - Avoided a C# 14 contextual `field` keyword collision in the hotkey layout
   diagnostic property.

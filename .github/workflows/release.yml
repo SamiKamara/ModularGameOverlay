@@ -34,7 +34,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 9.0.312
+          dotnet-version: 9.0.x
 
       - name: Select pinned .NET SDK
         shell: pwsh
@@ -43,16 +43,16 @@ jobs:
           # used by current source without changing the tagged source itself.
           if (-not (Test-Path '.\global.json')) {
               dotnet new globaljson `
-                  --sdk-version 9.0.312 `
-                  --roll-forward latestPatch
+                  --sdk-version 9.0.100 `
+                  --roll-forward latestFeature
               if ($LASTEXITCODE -ne 0) {
                   throw 'Could not create the temporary SDK selection file.'
               }
           }
 
           $sdkVersion = dotnet --version
-          if ($sdkVersion -ne '9.0.312') {
-              throw "Expected .NET SDK 9.0.312, received '$sdkVersion'."
+          if ($sdkVersion -notmatch '^9\.0\.\d+$') {
+              throw "Expected a .NET 9 SDK, received '$sdkVersion'."
           }
 
       - name: Validate tag, project version, and changelog

@@ -104,6 +104,7 @@ creates the exact GitHub Release assets under `artifacts\release\v<version>`.
 It verifies the generated checksum manifest before reporting success. See
 [RELEASING.md](RELEASING.md) for the release-specific acceptance process.
 
-The repository pins .NET SDK 9.0.312 in `global.json`. CI verifies that exact
-selection before compiling so a newer SDK installed on a runner cannot silently
-change the language version or build result.
+The repository pins builds to the .NET 9 SDK family in `global.json`. CI verifies
+that major-version selection before compiling so a .NET 10 or later SDK installed
+on a runner cannot silently change the language version or build result. Servicing
+updates and newer .NET 9 feature bands remain eligible.

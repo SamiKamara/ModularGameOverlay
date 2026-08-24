@@ -19,14 +19,14 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 9.0.312
+          dotnet-version: 9.0.x
 
       - name: Confirm pinned .NET SDK
         shell: pwsh
         run: |
           $sdkVersion = dotnet --version
-          if ($sdkVersion -ne '9.0.312') {
-              throw "Expected .NET SDK 9.0.312, received '$sdkVersion'."
+          if ($sdkVersion -notmatch '^9\.0\.\d+$') {
+              throw "Expected a .NET 9 SDK, received '$sdkVersion'."
           }
 
       - name: Restore
