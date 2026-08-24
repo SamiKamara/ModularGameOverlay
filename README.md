@@ -27,7 +27,9 @@ unknown-publisher warning.
 Requirements:
 
 - Windows 10 or Windows 11, x64;
-- .NET 9 SDK only when building from source.
+- .NET SDK 9.0.312 only when building from source. The repository's
+  `global.json` selects this version so newer installed SDKs cannot silently
+  change compiler behavior.
 
 Direct detected-game process audio capture requires Windows 10 version 2004
 (build 19041) or newer. If direct activation is unavailable, the sound module

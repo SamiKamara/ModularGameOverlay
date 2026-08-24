@@ -19,7 +19,15 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 9.0.312
+
+      - name: Confirm pinned .NET SDK
+        shell: pwsh
+        run: |
+          $sdkVersion = dotnet --version
+          if ($sdkVersion -ne '9.0.312') {
+              throw "Expected .NET SDK 9.0.312, received '$sdkVersion'."
+          }
 
       - name: Restore
         run: dotnet restore .\ModularGameOverlay.sln

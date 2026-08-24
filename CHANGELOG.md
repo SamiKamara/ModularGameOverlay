@@ -5,6 +5,14 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Pinned local and GitHub builds to .NET SDK 9.0.312 so newer runner SDKs cannot
+  silently select a different C# language version.
+- Made release changelog validation accept Windows CRLF line endings.
+- Avoided a C# 14 contextual `field` keyword collision in the hotkey layout
+  diagnostic property.
+
 ## [0.1.0] - 2026-08-24
 
 ### Added

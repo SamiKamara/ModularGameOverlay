@@ -90,6 +90,8 @@ repeated.
 - The application project, dated changelog entry, and tag versions agree.
 - Local release creation starts only from clean `main` matching `origin/main`.
 - Dependencies restore successfully.
+- The build uses the repository-pinned .NET SDK 9.0.312. The release workflow
+  supplies the same selection for older tags that predate `global.json`.
 - `dotnet format` reports no changes.
 - The Release build has no warnings or errors and all automated tests pass.
 - Publishing produces a self-contained Windows x64 executable without debug
@@ -136,7 +138,9 @@ gh workflow run release.yml --ref main -f tag=v0.1.0
 
 The workflow checks out the existing tag. If the release already exists, the
 four named assets are replaced with freshly verified copies; otherwise the
-release is created.
+release is created. This path is also appropriate after correcting a workflow
+or runner-environment defect on `main`, provided the tag, tagged source, version,
+and asset contract remain unchanged.
 
 ## Verify a downloaded executable
 

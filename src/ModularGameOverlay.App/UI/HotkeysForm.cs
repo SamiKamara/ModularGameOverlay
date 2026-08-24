@@ -97,7 +97,7 @@ internal sealed class HotkeysForm : Form
 
     internal IReadOnlyList<(Rectangle ClientBounds, Rectangle TextBounds)> BindingTextBounds =>
         _fields.Values
-            .Select(field => (field.ClientRectangle, field.TextBounds))
+            .Select(hotkeyField => (hotkeyField.ClientRectangle, hotkeyField.TextBounds))
             .ToArray();
 
     private void AddSection(TableLayoutPanel table, string text)

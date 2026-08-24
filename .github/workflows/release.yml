@@ -34,7 +34,26 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 9.0.312
+
+      - name: Select pinned .NET SDK
+        shell: pwsh
+        run: |
+          # Older tags may predate global.json. Generate the same SDK contract
+          # used by current source without changing the tagged source itself.
+          if (-not (Test-Path '.\global.json')) {
+              dotnet new globaljson `
+                  --sdk-version 9.0.312 `
+                  --roll-forward latestPatch
+              if ($LASTEXITCODE -ne 0) {
+                  throw 'Could not create the temporary SDK selection file.'
+              }
+          }
+
+          $sdkVersion = dotnet --version
+          if ($sdkVersion -ne '9.0.312') {
+              throw "Expected .NET SDK 9.0.312, received '$sdkVersion'."
+          }
 
       - name: Validate tag, project version, and changelog
         shell: pwsh
@@ -51,7 +70,7 @@ jobs:
           }
 
           $changelog = [IO.File]::ReadAllText('.\CHANGELOG.md', [Text.Encoding]::UTF8)
-          if ($changelog -notmatch "(?m)^## \[$([regex]::Escape($tagVersion))\] - \d{4}-\d{2}-\d{2}$") {
+          if ($changelog -notmatch "(?m)^## \[$([regex]::Escape($tagVersion))\] - \d{4}-\d{2}-\d{2}\r?$") {
               throw "CHANGELOG.md does not contain a dated [$tagVersion] release heading."
           }
 

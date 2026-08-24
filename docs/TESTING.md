@@ -103,3 +103,7 @@ and format, game display mode, and exact reproduction steps.
 creates the exact GitHub Release assets under `artifacts\release\v<version>`.
 It verifies the generated checksum manifest before reporting success. See
 [RELEASING.md](RELEASING.md) for the release-specific acceptance process.
+
+The repository pins .NET SDK 9.0.312 in `global.json`. CI verifies that exact
+selection before compiling so a newer SDK installed on a runner cannot silently
+change the language version or build result.
