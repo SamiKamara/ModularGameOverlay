@@ -74,8 +74,15 @@ menus.
 
 ## Module deactivation
 
-- SuperLighter hides the brightness overlay and restores gamma and color-matrix
-  effects when enhancement is disabled or the host exits.
+- SuperLighter selects one of two display-effect routes. If any enumerated
+  display adapter has NVIDIA PCI vendor ID `10DE` (with an adapter-name fallback),
+  gamma, contrast, saturation, and software brightness share the Windows
+  full-screen color matrix. This system-wide check also covers DisplayLink
+  topologies where Windows marks only the USB output as attached. Systems
+  without NVIDIA retain the original GDI gamma/contrast ramp, layered
+  software-brightness window, and full-screen saturation matrix. A route change
+  restores the old effects before applying the new route; deactivation and host
+  exit restore every software display-effect API.
 - Aimoro hides the reticle and stops its 25 ms input polling in embedded mode
   while the overlay is disabled.
 - SoundDirectionVisualizer hides its overlay and stops audio capture, render
@@ -87,8 +94,8 @@ menus.
 development machine. It verifies formatting, the Release build, and all tests
 before replacing the verified published instance. It cleans only a validated
 subdirectory under `artifacts`, creates one self-contained executable, updates
-the desktop shortcut, and restarts the application only when that exact
-published executable was running before the update.
+the current Windows user's desktop shortcut, and restarts the application only
+when that exact published executable was running before the update.
 
 ## GitHub Release flow
 

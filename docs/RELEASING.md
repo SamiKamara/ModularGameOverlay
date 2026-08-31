@@ -124,8 +124,9 @@ artifacts\release\v0.1.0
 ```
 
 On the configured development machine this command also uses the canonical
-local build/publish pipeline, verifies the desktop shortcut, and restarts only
-the exact canonical instance if it was already running. In GitHub Actions it
+local build/publish pipeline, verifies the current Windows user's desktop
+shortcut, and restarts only the exact canonical instance if it was already
+running. In GitHub Actions it
 uses an isolated publish directory and skips machine-specific desktop
 integration.
 

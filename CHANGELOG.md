@@ -5,14 +5,25 @@ semantic versioning.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-01
+
 ### Fixed
 
+- Added an NVIDIA-only SuperLighter compatibility path that applies gamma,
+  contrast, saturation, and software brightness through the working full-screen
+  color matrix. Other display adapters retain the original GDI gamma/contrast,
+  layered software-brightness, and full-screen saturation implementations.
+- Detected NVIDIA adapters by PCI vendor identity across the system display-adapter
+  list, including DisplayLink topologies where the attached desktop output is
+  not itself reported as NVIDIA.
 - Pinned local and GitHub builds to the .NET 9 SDK family so newer major SDKs
   cannot silently select a different C# language version while .NET 9 servicing
   updates remain eligible.
 - Made release changelog validation accept Windows CRLF line endings.
 - Avoided a C# 14 contextual `field` keyword collision in the hotkey layout
   diagnostic property.
+- Resolved the local build shortcut from the current Windows desktop instead of
+  a machine-specific user path.
 
 ## [0.1.0] - 2026-08-24
 
@@ -44,5 +55,6 @@ semantic versioning.
 - Added a complete dark renderer, including checked-item glyphs, to the host
   notification-area menu.
 
-[Unreleased]: https://github.com/SamiKamara/ModularGameOverlay/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/SamiKamara/ModularGameOverlay/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/SamiKamara/ModularGameOverlay/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/SamiKamara/ModularGameOverlay/releases/tag/v0.1.0

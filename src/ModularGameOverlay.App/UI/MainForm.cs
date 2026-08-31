@@ -77,7 +77,7 @@ internal sealed class MainForm : Form
         root.Controls.Add(CreateModuleCard(
             "SUPERLIGHTER",
             "Display light enhancement",
-            "Gamma, contrast, saturation, overlay brightness and monitor brightness.",
+            "Gamma, contrast, saturation, software brightness and monitor brightness.",
             _lightEnabled,
             openSuperLighterSettings,
             "Toggle Light Enhancement hotkey",

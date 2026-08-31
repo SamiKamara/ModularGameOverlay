@@ -11,13 +11,26 @@ module's detailed settings window.
 - gamma from 0.50 to 6.00
 - contrast from 50% to 200%
 - saturation from 0% to 300%
-- brightness overlay from 0% to 60%
+- software brightness from 0% to 60%
 - physical brightness for DDC/CI-capable displays
 - per-monitor settings persistence
 - Reset display and neutral values
 - Toggle enhancement and Open settings hotkeys
-- restoration of gamma, color-matrix, and overlay effects on deactivation and
-  Exit
+- restoration of software display effects on deactivation and Exit
+
+On systems with an NVIDIA display adapter, gamma, contrast, saturation, and
+software brightness use the Windows full-screen color-effect matrix. Contrast is
+represented exactly. A matrix cannot express a nonlinear gamma curve, so gamma
+uses a bounded midtone approximation that keeps the complete slider range
+responsive on tested NVIDIA paths that ignore desktop GDI gamma ramps. Software
+brightness remains equivalent to blending a white overlay at the selected
+opacity without depending on a layered topmost window. This route does not
+install or replace the user's system ICC color profile.
+
+Systems without an NVIDIA display adapter retain the imported SuperLighter
+behavior: the original nonlinear GDI gamma/contrast ramp, the click-through
+layered software-brightness window, and the Windows full-screen saturation
+matrix. Physical DDC/CI brightness remains independent on both routes.
 
 Intentional host differences: Open settings starts unbound, and the toggle can
 also be cleared in the detailed module window. Light Enhancement retains the

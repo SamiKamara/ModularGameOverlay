@@ -15,7 +15,11 @@ if ([string]::IsNullOrWhiteSpace($PublishDirectory)) {
 }
 $publishDirectory = [IO.Path]::GetFullPath($PublishDirectory)
 $publishedExecutable = Join-Path $publishDirectory 'ModularGameOverlay.exe'
-$shortcutPath = 'C:\Users\samin\Desktop\ModularGameOverlay.lnk'
+$desktopDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
+if ([string]::IsNullOrWhiteSpace($desktopDirectory)) {
+    throw 'Unable to resolve the current Windows desktop directory.'
+}
+$shortcutPath = Join-Path $desktopDirectory 'ModularGameOverlay.lnk'
 
 if (-not $SkipDesktopShortcut -and -not [string]::Equals(
         $publishDirectory,

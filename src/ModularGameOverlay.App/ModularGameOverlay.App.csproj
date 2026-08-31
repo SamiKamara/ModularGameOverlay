@@ -8,7 +8,7 @@
     <Product>ModularGameOverlay</Product>
     <Description>Unified modular game overlay host for SuperLighter, Aimoro, and SoundDirectionVisualizer.</Description>
     <Authors>SamiKamara</Authors>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <RepositoryUrl>https://github.com/SamiKamara/ModularGameOverlay</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PublishSingleFile>true</PublishSingleFile>

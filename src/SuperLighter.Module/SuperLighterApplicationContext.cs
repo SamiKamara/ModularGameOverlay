@@ -8,7 +8,7 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
 {
     private readonly SettingsStore _settingsStore = new();
     private readonly GammaRampService _gammaRampService = new();
-    private readonly SaturationService _saturationService = new();
+    private readonly DisplayColorEffectService _colorEffectService = new();
     private readonly OverlayManager _overlayManager = new();
     private readonly MonitorBrightnessService _monitorBrightnessService = new();
     private readonly SystemHotkeyWindow _hotkeyWindow = new();
@@ -24,6 +24,7 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
     private readonly Action<AppSettings>? _externalSave;
     private readonly bool _embeddedHost;
     private AppSettings _settings;
+    private DisplayEffectRouting _effectRouting;
     private SettingsForm? _activeSettingsForm;
     private bool _displayWarningShown;
     private bool _hotkeyWarningShown;
@@ -41,6 +42,7 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
         _openSettingsSignal = openSettingsSignal;
         _settings = initialSettings?.Clone() ?? _settingsStore.Load();
         _settings.Normalize();
+        _effectRouting = DisplayEffectRouting.Detect();
         _ = _uiDispatcher.Handle;
         _monitorBrightnessService.Refresh();
         ApplyStoredMonitorBrightness();
@@ -83,7 +85,13 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
 
         _hotkeyWindow.HotkeyPressed += HandleHotkeyPressed;
         _startupTimer.Tick += HandleStartupTimerTick;
-        _topMostTimer.Tick += (_, _) => _overlayManager.EnsureTopMost();
+        _topMostTimer.Tick += (_, _) =>
+        {
+            if (_effectRouting.UseLegacyGammaAndBrightness)
+            {
+                _overlayManager.EnsureTopMost();
+            }
+        };
         SystemEvents.DisplaySettingsChanged += HandleDisplaySettingsChanged;
         SystemEvents.PowerModeChanged += HandlePowerModeChanged;
         SystemEvents.SessionSwitch += HandleSessionSwitch;
@@ -110,7 +118,7 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
 
         _overlayManager.Hide();
         _gammaRampService.Restore();
-        _saturationService.Restore();
+        _colorEffectService.Restore();
         _effectsRestored = true;
     }
 
@@ -118,22 +126,35 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
     {
         _effectsRestored = false;
         settings.Normalize();
-        _overlayManager.Apply(settings);
-        var failedDisplays = _gammaRampService.Apply(settings);
-        var saturationApplied = _saturationService.Apply(settings);
+        IReadOnlyList<string> failedDisplays;
+        if (_effectRouting.UseLegacyGammaAndBrightness)
+        {
+            _overlayManager.Apply(settings);
+            failedDisplays = _gammaRampService.Apply(settings);
+        }
+        else
+        {
+            _overlayManager.Hide();
+            _gammaRampService.Restore();
+            failedDisplays = Array.Empty<string>();
+        }
+
+        var colorEffectApplied = _colorEffectService.Apply(
+            settings,
+            _effectRouting.UseNvidiaCompatibilityMatrix);
         _enabledMenuItem.Checked = settings.Enabled;
 
         var state = settings.Enabled ? "enabled" : "disabled";
         var trayText = $"SuperLighter - {state}";
         _notifyIcon.Text = trayText.Length <= 63 ? trayText : trayText[..63];
 
-        if ((failedDisplays.Count > 0 || !saturationApplied) && !_displayWarningShown)
+        if ((failedDisplays.Count > 0 || !colorEffectApplied) && !_displayWarningShown)
         {
             _displayWarningShown = true;
             _notifyIcon.ShowBalloonTip(
                 5000,
                 "A display effect could not be applied",
-                "HDR, Remote Desktop, another color tool, or the display driver may restrict gamma, contrast, or saturation. The brightness overlay still works.",
+                "HDR, Remote Desktop, another color tool, or the display driver may restrict a software display effect. Physical monitor brightness remains independent when available.",
                 ToolTipIcon.Warning);
         }
     }
@@ -316,6 +337,7 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
                     ApplyStoredMonitorBrightness();
                 }
 
+                RefreshEffectRouting();
                 _overlayManager.RefreshDisplays();
                 ApplySettings(_settings);
             }));
@@ -326,6 +348,20 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
         catch (InvalidOperationException)
         {
         }
+    }
+
+    private void RefreshEffectRouting()
+    {
+        var detectedRouting = DisplayEffectRouting.Detect();
+        if (detectedRouting == _effectRouting)
+        {
+            return;
+        }
+
+        _overlayManager.Hide();
+        _gammaRampService.Restore();
+        _colorEffectService.Restore();
+        _effectRouting = detectedRouting;
     }
 
     public void SetHotkeys(HotkeyDefinition toggle, HotkeyDefinition openSettings)
@@ -403,8 +439,8 @@ public sealed class SuperLighterApplicationContext : ApplicationContext
             _hotkeyWindow.Dispose();
             _monitorBrightnessService.Dispose();
             _overlayManager.Dispose();
-            _saturationService.Dispose();
             _gammaRampService.Dispose();
+            _colorEffectService.Dispose();
             _startupTimer.Dispose();
             _topMostTimer.Dispose();
             _uiDispatcher.Dispose();

@@ -15,18 +15,19 @@ The command performs these gates in order:
 5. controlled replacement of a running instance whose exact path is the
    canonical published executable;
 6. clean self-contained single-file publish;
-7. desktop-shortcut target, working-directory, and SHA-256 verification;
+7. current-user desktop-shortcut target, working-directory, and SHA-256
+   verification;
 8. restart of the canonical instance only when it was running before publish.
 
 ## Automated coverage
 
-The latest local Release run on 2026-08-24 passed 152 tests:
+The latest local Release run on 2026-09-01 passed 158 tests:
 
 | Suite | Tests | Main coverage |
 | --- | ---: | --- |
 | SoundDirectionVisualizer.Core.Tests | 62 | stereo and multichannel analysis, calibration, loudness, trail, and visualization models |
 | SoundDirectionVisualizer.App.Tests | 76 | audio source, fallback and probing, settings, UI, display detection, and process detection |
-| ModularGameOverlay.Tests | 14 | defaults, migration, idempotency, partially invalid settings, canonical/unbound/duplicate hotkeys, the eight-field editor, vertically centered hotkey text, main-window right-edge alignment, shared titles/icons, dark menu rendering, and the SuperLighter self-test |
+| ModularGameOverlay.Tests | 20 | defaults, migration, idempotency, partially invalid settings, canonical/unbound/duplicate hotkeys, the eight-field editor, vertically centered hotkey text, main-window right-edge alignment, shared titles/icons, dark menu rendering, the SuperLighter self-test, NVIDIA adapter routing, preservation of the non-NVIDIA gamma ramp, NVIDIA-compatible gamma and contrast matrices, and software-brightness blending |
 
 The Release build must finish with 0 warnings and 0 errors. Tests must not be
 skipped, weakened, or rewritten merely to make an implementation pass.
@@ -69,8 +70,12 @@ desktop and verify:
   125%, and 150% Windows scaling.
 - [ ] Light Enhancement `Ctrl+Alt+B` works globally, updates the main-window
   state, and restores the display correctly when disabled and on Exit.
-- [ ] SuperLighter gamma, contrast, saturation, brightness overlay, and
-  available monitor-brightness controls match the legacy application.
+- [ ] SuperLighter gamma, contrast, saturation, software brightness, and
+  available monitor-brightness controls match the intended route. On NVIDIA,
+  exercise gamma 4.17 with contrast 120% and confirm the visible matrix change
+  on every SDR display. On a non-NVIDIA system, confirm the original nonlinear
+  GDI gamma/contrast behavior and click-through layered software brightness.
+  Record HDR state and display-adapter/driver details for failures.
 - [ ] Aimoro reticle, right-mouse hold-to-show, colors, dimensions, and center
   dot match the legacy application.
 - [ ] Aimoro follows a Steam game in automatic mode, and display cycling works
